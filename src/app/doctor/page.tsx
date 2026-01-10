@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { api, clearToken } from "@/lib/api";
 import { api, clearToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
