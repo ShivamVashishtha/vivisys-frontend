@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { api, clearToken } from "@/lib/api";
+import { api, clearToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
 
@@ -56,7 +57,7 @@ export default function DoctorPage() {
   const router = useRouter();
 
   const [patientId, setPatientId] = useState("");
-  const [scope, setScope] = useState("immunizations");
+  const [scope, setScope] = useState<Scope>("immunizations");
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState<string>("");
   const [selected, setSelected] = useState<number>(0);
@@ -118,7 +119,7 @@ export default function DoctorPage() {
               <select
                 className="input mt-2"
                 value={scope}
-                onChange={(e) => setScope(e.target.value)}
+                onChange={(e) => setScope(e.target.value as Scope)}
               >
                 <option value="immunizations">immunizations</option>
                 <option value="allergies">allergies</option>
