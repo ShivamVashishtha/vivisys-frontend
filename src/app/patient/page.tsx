@@ -1,0 +1,567 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { api, clearToken, Scope } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import AppShell from "@/app/_components/AppShell";
+import ConsentDashboard from "@/app/_components/ConsentDashboard";
+
+const CATALOG = {
+  immunizations: ["Polio", "MMR", "Hepatitis B", "Tdap", "Varicella", "Influenza", "COVID-19", "HPV"],
+  conditions: ["Asthma", "Diabetes mellitus", "Hypertension", "Migraine", "Anxiety disorder"],
+  allergies: ["Peanut", "Penicillin", "Latex", "Shellfish", "Pollen"],
+} as const;
+
+
+type RecordItem = {
+  issuer: string;
+  pointer_id: string;
+  resource: any;
+};
+
+function formatDate(s?: string) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString();
+}
+
+function resourceSummary(resource: any) {
+  const rt = resource?.resourceType ?? "Resource";
+  if (rt === "Immunization") {
+    return {
+      type: resource?.vaccineCode?.text ?? "Immunization",
+      status: resource?.status ?? "—",
+      date: formatDate(resource?.occurrenceDateTime),
+      id: resource?.id ?? "—",
+    };
+  }
+  if (rt === "AllergyIntolerance") {
+    return {
+      type: resource?.code?.text ?? "Allergy",
+      status:
+        resource?.clinicalStatus?.text ??
+        resource?.clinicalStatus?.coding?.[0]?.code ??
+        "—",
+      date: formatDate(resource?.recordedDate),
+      id: resource?.id ?? "—",
+    };
+  }
+  if (rt === "Condition") {
+    return {
+      type: resource?.code?.text ?? "Condition",
+      status:
+        resource?.clinicalStatus?.text ??
+        resource?.clinicalStatus?.coding?.[0]?.code ??
+        "—",
+      date: formatDate(resource?.recordedDate ?? resource?.onsetDateTime),
+      id: resource?.id ?? "—",
+    };
+  }
+  return {
+    type: rt,
+    status: resource?.status ?? "—",
+    date: formatDate(resource?.meta?.lastUpdated),
+    id: resource?.id ?? "—",
+  };
+}
+
+// Helper to generate a default expires_at for the consent form (7 days from now)
+function defaultExpiresLocal(): string {
+  const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // datetime-local expects "YYYY-MM-DDTHH:MM"
+  return d.toISOString().slice(0, 16);
+}
+
+export default function PatientPage() {
+  const router = useRouter();
+
+  // Self-registration
+  const [dob, setDob] = useState("1990-01-01");
+  const [profile, setProfile] = useState<{ id: string; public_id: string } | null>(null);
+
+  // Records
+  const [scope, setScope] = useState<Scope>("immunizations");
+  const [result, setResult] = useState<any>(null);
+  const [selected, setSelected] = useState<number>(0);
+
+  // Global error / loading (used for major actions)
+  const [err, setErr] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+
+  // Consent grant form (patient -> doctor)
+  const [doctorEmail, setDoctorEmail] = useState("doctor@test.com");
+  const [consentScope, setConsentScope] = useState<Scope>("immunizations");
+  const [expiresLocal, setExpiresLocal] = useState(defaultExpiresLocal());
+  const [consentMsg, setConsentMsg] = useState<string>("");
+
+  const [ptrScope, setPtrScope] = useState<Scope>("immunizations");
+  const [ptrFhirId, setPtrFhirId] = useState("");
+  const [ptrIssuer, setPtrIssuer] = useState("Self (Patient)");
+  const [ptrMsg, setPtrMsg] = useState("");
+
+  const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
+  const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
+  const [catIssuer, setCatIssuer] = useState("Self (Patient)");
+  const [catMsg, setCatMsg] = useState("");
+
+
+  const records: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
+  const selectedRecord = records[selected];
+
+  async function logout() {
+    clearToken();
+    router.push("/login");
+  }
+
+  async function registerSelf() {
+    setErr("");
+    setConsentMsg("");
+    setLoading(true);
+    try {
+      const p = await api.selfRegisterPatient(dob);
+      setProfile({ id: p.id, public_id: p.public_id });
+    } catch (e: any) {
+      setErr(e.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchMyRecords() {
+    setErr("");
+    setConsentMsg("");
+    setResult(null);
+    setSelected(0);
+    setLoading(true);
+    try {
+      const res = await api.getMyRecords(scope);
+      setResult(res);
+      if (res?.patient_public_id) {
+        setProfile({ id: res.patient_id, public_id: res.patient_public_id });
+      }
+    } catch (e: any) {
+      setErr(e.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function grantDoctorAccess() {
+    setErr("");
+    setConsentMsg("");
+    setLoading(true);
+    try {
+      if (!profile?.public_id) throw new Error("Register yourself first (DOB) to get a Patient ID.");
+
+      // Convert datetime-local string to ISO
+      const expiresAt = expiresLocal ? new Date(expiresLocal).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString();
+
+      await api.grantConsent(profile.public_id, {
+        grantee_email: doctorEmail.trim(),
+        scope: consentScope,
+        expires_at: expiresAt,
+      });
+
+      setConsentMsg(`✅ Consent granted to ${doctorEmail} for ${consentScope} (expires ${new Date(expiresAt).toLocaleString()})`);
+    } catch (e: any) {
+      setErr(e.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createAndLinkFromCatalog() {
+    setErr("");
+    setCatMsg("");
+    setLoading(true);
+    try {
+      const res = await api.createFromCatalog({
+        scope: catScope,
+        display: catItem,
+        issuer: catIssuer,
+      });
+      setCatMsg(`✅ Created ${res.fhir_resource_type}/${res.fhir_resource_id} and linked pointer.`);
+    } catch (e: any) {
+      setErr(e.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+  async function addMyPointer() {
+    setErr("");
+    setPtrMsg("");
+    setLoading(true);
+    try {
+      await api.addMyPointer({
+        scope: ptrScope,
+        fhir_resource_id: ptrFhirId.trim(),
+        issuer: ptrIssuer.trim() || "Self (Patient)",
+      });
+      setPtrMsg("✅ Pointer added. Now fetch records to see it.");
+      setPtrFhirId("");
+    } catch (e: any) {
+      setErr(e.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+  return (
+    <AppShell
+      title="My Records"
+      subtitle="Self access (18+). Register your DOB once, then browse your scoped records."
+      activeNav="Records"
+      onLogout={logout}
+      right={
+        <>
+          {profile?.public_id ? (
+            <span className="pill">Patient: {profile.public_id}</span>
+          ) : (
+            <span className="pill">Not registered</span>
+          )}
+          <span className="pill">Scope: {scope}</span>
+        </>
+      }
+    >
+      {/* Self registration */}
+      <div className="card" id="patients">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Self registration</div>
+          <div className="text-xs text-slate-500">Link your patient profile to this login. You must be 18+.</div>
+        </div>
+
+        <div className="card-b grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[240px_180px_1fr] gap-2 items-end">
+            <div>
+              <div className="label">Date of Birth</div>
+              <input className="input mt-2" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+            </div>
+
+            <div className="flex gap-2">
+              <button className="btn-primary w-full" disabled={loading} onClick={registerSelf}>
+                {loading ? "Working..." : "Register"}
+              </button>
+            </div>
+
+            <div className="text-sm text-slate-600">
+              {profile ? (
+                <>
+                  Linked as <span className="font-mono">{profile.public_id}</span>
+                </>
+              ) : (
+                "Not linked yet. Register to enable self-access."
+              )}
+            </div>
+          </div>
+
+          {err ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Grant consent (Patient -> Doctor) */}
+      <div className="card">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Grant doctor access</div>
+          <div className="text-xs text-slate-500">Create a time-bound consent for a doctor to view your records.</div>
+        </div>
+
+        <div className="card-b grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_240px_160px] gap-2 items-end">
+            <div>
+              <div className="label">Doctor email</div>
+              <input
+                className="input mt-2"
+                value={doctorEmail}
+                onChange={(e) => setDoctorEmail(e.target.value)}
+                placeholder="doctor@test.com"
+              />
+            </div>
+
+            <div>
+              <div className="label">Scope</div>
+              <select
+                className="input mt-2"
+                value={consentScope}
+                onChange={(e) => setConsentScope(e.target.value as Scope)}
+              >
+                <option value="immunizations">immunizations</option>
+                <option value="allergies">allergies</option>
+                <option value="conditions">conditions</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="label">Expires at</div>
+              <input
+                className="input mt-2"
+                type="datetime-local"
+                value={expiresLocal}
+                onChange={(e) => setExpiresLocal(e.target.value)}
+              />
+            </div>
+
+            <button className="btn-primary" disabled={loading} onClick={grantDoctorAccess}>
+              {loading ? "Working..." : "Grant"}
+            </button>
+          </div>
+
+          {consentMsg ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              {consentMsg}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Consent dashboard */}
+      <div id="consents">
+        <ConsentDashboard mode="patient" />
+      </div>
+
+            <div className="card">
+    <div className="card-h">
+      <div className="text-sm font-semibold">Add from catalog</div>
+      <div className="text-xs text-slate-500">
+        Pick a standard item (vaccine/condition/allergy). We will create the FHIR resource automatically and link it.
+      </div>
+    </div>
+
+    <div className="card-b grid gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
+        <div>
+          <div className="label">Category</div>
+          <select
+            className="input mt-2"
+            value={catScope}
+            onChange={(e) => {
+              const v = e.target.value as any;
+              setCatScope(v);
+              setCatItem((CATALOG as any)[v][0]);
+            }}
+          >
+            <option value="immunizations">immunizations</option>
+            <option value="conditions">conditions</option>
+            <option value="allergies">allergies</option>
+          </select>
+        </div>
+
+        <div>
+          <div className="label">Pick item</div>
+          <select className="input mt-2" value={catItem} onChange={(e) => setCatItem(e.target.value)}>
+            {(CATALOG as any)[catScope].map((x: string) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <div className="label">Issuer</div>
+          <input className="input mt-2" value={catIssuer} onChange={(e) => setCatIssuer(e.target.value)} />
+        </div>
+
+        <button className="btn-primary" disabled={loading} onClick={createAndLinkFromCatalog}>
+          {loading ? "Working..." : "Create & Link"}
+        </button>
+      </div>
+
+      {catMsg ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{catMsg}</div>
+      ) : null}
+    </div>
+  </div>
+
+
+      {/* Add my pointer */}
+      <div className="card">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Add my record pointer</div>
+          <div className="text-xs text-slate-500">
+            Adds a pointer to your own FHIR record (HAPI FHIR). Then you can fetch and view it.
+          </div>
+        </div>
+
+        <div className="card-b grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
+            <div>
+              <div className="label">Scope</div>
+              <select className="input mt-2" value={ptrScope} onChange={(e) => setPtrScope(e.target.value as Scope)}>
+                <option value="immunizations">immunizations</option>
+                <option value="allergies">allergies</option>
+                <option value="conditions">conditions</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="label">FHIR Resource ID</div>
+              <input
+                className="input mt-2"
+                value={ptrFhirId}
+                onChange={(e) => setPtrFhirId(e.target.value)}
+                placeholder='e.g. "1001"'
+              />
+            </div>
+
+            <div>
+              <div className="label">Issuer</div>
+              <input
+                className="input mt-2"
+                value={ptrIssuer}
+                onChange={(e) => setPtrIssuer(e.target.value)}
+                placeholder="Hospital / Clinic name"
+              />
+            </div>
+
+            <button className="btn-primary" disabled={loading} onClick={addMyPointer}>
+              {loading ? "Working..." : "Add"}
+            </button>
+          </div>
+
+          {ptrMsg ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              {ptrMsg}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+
+      {/* Fetch records */}
+      <div className="card">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Browse my records</div>
+          <div className="text-xs text-slate-500">
+            This calls <span className="font-mono">GET /records/me</span>.
+          </div>
+        </div>
+
+        <div id="records" className="card-b grid grid-cols-1 md:grid-cols-[240px_160px] gap-2 items-end">
+          <div>
+            <div className="label">Scope</div>
+            <select className="input mt-2" value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
+              <option value="immunizations">immunizations</option>
+              <option value="allergies">allergies</option>
+              <option value="conditions">conditions</option>
+            </select>
+          </div>
+
+          <button className="btn-primary" disabled={loading} onClick={fetchMyRecords}>
+            {loading ? "Fetching..." : "Fetch"}
+          </button>
+        </div>
+      </div>
+
+      {/* Results */}
+      {result ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+          {/* Table */}
+          <div className="card overflow-hidden">
+            <div className="card-h flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold">Records</div>
+                <div className="text-xs text-slate-500">
+                  {result.patient_public_id ? (
+                    <>
+                      patient: <span className="font-mono">{result.patient_public_id}</span> ·{" "}
+                    </>
+                  ) : null}
+                  {result.count} record(s)
+                </div>
+              </div>
+              <span className="pill">{result.scope}</span>
+            </div>
+
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-white border-b border-slate-100">
+                  <tr className="text-left text-slate-600">
+                    <th className="px-4 py-3 font-semibold">Date</th>
+                    <th className="px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Issuer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r, idx) => {
+                    const s = resourceSummary(r.resource);
+                    const active = idx === selected;
+                    return (
+                      <tr
+                        key={r.pointer_id}
+                        className={[
+                          "border-b border-slate-100 cursor-pointer",
+                          active ? "bg-slate-50" : "hover:bg-slate-50/60",
+                        ].join(" ")}
+                        onClick={() => setSelected(idx)}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">{s.date}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900">{s.type}</div>
+                          <div className="text-xs text-slate-500">
+                            {r.resource?.resourceType} / {s.id}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="pill">{s.status}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-slate-900">{r.issuer}</div>
+                          <div className="text-xs text-slate-500 font-mono">ptr:{r.pointer_id.slice(0, 8)}…</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {records.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-10 text-slate-500" colSpan={4}>
+                        No records returned.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="card overflow-hidden">
+            <div className="card-h">
+              <div className="text-sm font-semibold">Record details</div>
+              <div className="text-xs text-slate-500">
+                {selectedRecord ? (
+                  <>
+                    issuer: <span className="font-medium">{selectedRecord.issuer}</span> · pointer:{" "}
+                    <span className="font-mono">{selectedRecord.pointer_id}</span>
+                  </>
+                ) : (
+                  "Select a record to view details."
+                )}
+              </div>
+            </div>
+
+            <div className="p-4">
+              {selectedRecord ? (
+                <pre className="h-[520px] overflow-auto rounded-2xl border border-slate-200 bg-slate-950 text-slate-100 p-4 text-xs leading-relaxed">
+{JSON.stringify(selectedRecord.resource, null, 2)}
+                </pre>
+              ) : (
+                <div className="text-sm text-slate-600">No selection.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Audit anchor placeholder for sidebar */}
+      <div id="audit" />
+    </AppShell>
+  );
+}

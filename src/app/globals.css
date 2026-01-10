@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* nicer scrollbars (optional) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* small utility helpers */
+@layer utilities {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+  .card-h {
+    @apply px-5 py-4 border-b border-slate-100;
+  }
+  .card-b {
+    @apply p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply btn bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60;
+  }
+  .btn-ghost {
+    @apply btn border border-slate-200 bg-white hover:bg-slate-50;
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none
+           focus:ring-4 focus:ring-slate-100 focus:border-slate-300;
+  }
+  .label {
+    @apply text-xs font-semibold text-slate-700;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700;
+  }
+}
