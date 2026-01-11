@@ -1,12 +1,9 @@
 // src/lib/api.ts
 const API_BASE =
-  (process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ||
-    "http://localhost:8000");
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ||
+  "http://localhost:8000";
 
 const TOKEN_KEY = "medaryx_token";
-
-export type Role = "guardian" | "doctor" | "patient" | "clinic_admin";
-export type Scope = "immunizations" | "allergies" | "conditions";
 
 export function setToken(token: string) {
   if (typeof window === "undefined") return;
@@ -23,19 +20,18 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export type Role = "guardian" | "doctor" | "patient" | "clinic_admin";
+export type Scope = "immunizations" | "allergies" | "conditions";
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
   auth: boolean = true
 ): Promise<T> {
   const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
   };
-
-  // Only set JSON header when we actually send JSON
-  if (!headers["Content-Type"] && options.body) {
-    headers["Content-Type"] = "application/json";
-  }
 
   if (auth) {
     const token = getToken();
@@ -47,13 +43,14 @@ async function request<T>(
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
-      // IMPORTANT: do NOT use mode:"no-cors" (it will break everything)
+      // NOTE: keep default mode="cors"
     });
   } catch (e: any) {
-    // This is where CORS/network errors show up as "Failed to fetch"
+    // This is what you usually see when CORS blocks or DNS fails:
     throw new Error(
       `Network/CORS error calling ${API_BASE}${path}. ` +
-      `Check NEXT_PUBLIC_API_BASE and backend CORS. Original: ${e?.message || e}`
+        `Check NEXT_PUBLIC_API_BASE and backend CORS. ` +
+        (e?.message ? `(${e.message})` : "")
     );
   }
 
@@ -147,7 +144,7 @@ export const api = {
       true
     ),
 
-  // Patient self-access (this endpoint should be PUBLIC on backend)
+  // Patient self-access (THIS should be auth=false if you want it public)
   selfRegisterPatient: (date_of_birth: string) =>
     request<{ id: string; public_id: string; guardian_user_id: string; created_at: string }>(
       "/patients/self/register",
@@ -162,11 +159,7 @@ export const api = {
       scope: Scope;
       count: number;
       records: Array<{ issuer: string; pointer_id: string; resource: any }>;
-    }>(
-      `/records/me?scope=${encodeURIComponent(scope)}`,
-      {},
-      true
-    ),
+    }>(`/records/me?scope=${encodeURIComponent(scope)}`, {}, true),
 
   // Consents
   getConsentsForPatient: (patientIdentifier: string) =>
@@ -183,11 +176,7 @@ export const api = {
         revoked: boolean;
         created_at: string;
       }>;
-    }>(
-      `/consents/patients/${encodeURIComponent(patientIdentifier)}`,
-      {},
-      true
-    ),
+    }>(`/consents/patients/${encodeURIComponent(patientIdentifier)}`, {}, true),
 
   getMyConsents: () =>
     request<{
