@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { api, clearToken } from "@/lib/api";
+import { api, clearToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
 import ConsentDashboard from "@/app/_components/ConsentDashboard";
-
-type Scope = "immunizations" | "allergies" | "conditions";
 
 export default function GuardianPage() {
   const router = useRouter();
@@ -31,7 +29,6 @@ export default function GuardianPage() {
     setMsg("");
     try {
       const p = await api.createPatient(); // expected: { id, public_id, ... }
-      // Use readable public_id for everything
       setPatientIdentifier(p.public_id ?? p.id);
       setMsg(`✅ Created patient: ${p.public_id ?? p.id}`);
     } catch (e: any) {
@@ -72,7 +69,7 @@ export default function GuardianPage() {
         expires_at: exp,
       });
 
-      setMsg("✅ Consent granted");
+      setMsg(`✅ Consent granted (${scope})`);
     } catch (e: any) {
       setMsg(`❌ ${e.message ?? "Failed to grant consent"}`);
     }
@@ -92,10 +89,14 @@ export default function GuardianPage() {
   return (
     <AppShell
       title="Guardian Console"
-      subtitle="Create patients, register pointers, and grant scoped consent."
-      activeNav="Dashboard"
+      subtitle="Create patients, register pointers, and grant consent."
+      activeNav="Patients"
       onLogout={logout}
-      right={<>{patientReady ? <span className="pill">Patient loaded</span> : <span className="pill">No patient</span>}</>}
+      right={
+        <>
+          {patientReady ? <span className="pill">Patient loaded</span> : <span className="pill">No patient</span>}
+        </>
+      }
     >
       {/* Patient */}
       <div className="card" id="patients">
@@ -126,7 +127,7 @@ export default function GuardianPage() {
           </div>
 
           <div className="text-xs text-slate-500">
-            Next: add a pointer to a FHIR Immunization record (HAPI FHIR), then grant consent to a doctor.
+            Next: add a pointer to a FHIR record, then grant consent to a doctor.
           </div>
         </div>
       </div>
@@ -194,7 +195,7 @@ export default function GuardianPage() {
       <div className="card">
         <div className="card-h">
           <div className="text-sm font-semibold">Grant consent</div>
-          <div className="text-xs text-slate-500">Consent is scoped and expires automatically.</div>
+          <div className="text-xs text-slate-500">Consent can be scoped, time-bound, and revoked.</div>
         </div>
 
         <div className="card-b grid gap-4">
@@ -212,10 +213,14 @@ export default function GuardianPage() {
             <div className="md:col-span-1">
               <div className="label">Scope</div>
               <select className="input mt-2" value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
+                <option value="all">all</option>
                 <option value="immunizations">immunizations</option>
                 <option value="allergies">allergies</option>
                 <option value="conditions">conditions</option>
               </select>
+              <div className="text-xs text-slate-500 mt-1">
+                Tip: <span className="font-medium">all</span> gives access to all record scopes.
+              </div>
             </div>
 
             <div className="md:col-span-1">
