@@ -451,6 +451,43 @@ export default function PatientPage() {
         </div>
       </div>
 
+      {/* Selected hospital */}
+      <div className="card">
+        <div className="card-h">
+          <div>
+            <div className="text-sm font-semibold">Record source (Hospital)</div>
+            <div className="text-xs text-slate-500">
+              This hospital will be used as the source for new records unless you choose “Other”.
+            </div>
+          </div>
+      
+          <a href="/patient/hospitals" className="btn-ghost">
+            {hospitalSource ? "Change" : "Select"}
+          </a>
+        </div>
+      
+        <div className="card-b">
+          {hospitalSource ? (
+            <div className="grid gap-2">
+              <div className="font-medium text-slate-900">
+                {hospitalSource.name}
+              </div>
+              {hospitalSource.npi ? (
+                <div className="text-xs text-slate-600">
+                  NPI: <span className="font-mono">{hospitalSource.npi}</span>
+                </div>
+              ) : null}
+              <span className="pill-success w-fit">Default source</span>
+            </div>
+          ) : (
+            <div className="empty">
+              No hospital selected yet. Select one to mark records as hospital-verified.
+            </div>
+          )}
+        </div>
+      </div>
+
+      
       {/* Grant consent (Patient -> Doctor) */}
       <div className="card">
         <div className="card-h">
