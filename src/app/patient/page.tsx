@@ -5,8 +5,6 @@ import { api, clearToken, getToken, setToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
 import ConsentDashboard from "@/app/_components/ConsentDashboard";
-import RecordsViewer from "@/app/_components/RecordsViewer";
-
 
 const CATALOG = {
   immunizations: ["Polio", "MMR", "Hepatitis B", "Tdap", "Varicella", "Influenza", "COVID-19", "HPV"],
@@ -583,13 +581,17 @@ export default function PatientPage() {
 
       {/* Results */}
       {result ? (
-        <RecordsViewer
-          records={result.records}
-          scope={result.scope}
-          patientPublicId={result.patient_public_id}
-        />
-      ) : null}
-
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+          <div className="card overflow-hidden">
+            <div className="card-h flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold">Records</div>
+                <div className="text-xs text-slate-500">
+                  {result.patient_public_id ? (
+                    <>
+                      patient: <span className="font-mono">{result.patient_public_id}</span> ·{" "}
+                    </>
+                  ) : null}
                   {result.count} record(s)
                 </div>
               </div>
