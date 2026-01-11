@@ -21,7 +21,7 @@ export function clearToken() {
 }
 
 export type Role = "guardian" | "doctor" | "patient" | "clinic_admin";
-export type Scope = "immunizations" | "allergies" | "conditions";
+export type Scope = "immunizations" | "allergies" | "conditions" | "all";
 
 type Consent = {
   id: string;
