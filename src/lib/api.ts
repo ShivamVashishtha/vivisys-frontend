@@ -23,6 +23,17 @@ export function clearToken() {
 export type Role = "guardian" | "doctor" | "patient" | "clinic_admin";
 export type Scope = "immunizations" | "allergies" | "conditions";
 
+type Consent = {
+  id: string;
+  patient_id: string;
+  patient_public_id: string;
+  grantee_email: string;
+  scope: string;
+  expires_at: string;
+  revoked: boolean;
+  created_at: string;
+};
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -46,7 +57,6 @@ async function request<T>(
       // NOTE: keep default mode="cors"
     });
   } catch (e: any) {
-    // This is what you usually see when CORS blocks or DNS fails:
     throw new Error(
       `Network/CORS error calling ${API_BASE}${path}. ` +
         `Check NEXT_PUBLIC_API_BASE and backend CORS. ` +
@@ -75,7 +85,9 @@ async function request<T>(
 }
 
 export const api = {
+  // ======================
   // Auth
+  // ======================
   register: (email: string, password: string, role: Role) =>
     request<{ access_token: string; token_type: string }>(
       "/auth/register",
@@ -96,7 +108,9 @@ export const api = {
       false
     ),
 
+  // ======================
   // Guardian
+  // ======================
   createPatient: () =>
     request<{ id: string; public_id: string; guardian_user_id: string; created_at: string }>(
       "/patients",
@@ -120,6 +134,9 @@ export const api = {
       true
     ),
 
+  // ======================
+  // Consents
+  // ======================
   grantConsent: (
     patientIdentifier: string,
     payload: { grantee_email: string; scope: Scope; expires_at: string }
@@ -130,7 +147,31 @@ export const api = {
       true
     ),
 
+  getConsentsForPatient: (patientIdentifier: string) =>
+    request<{
+      patient_id: string;
+      patient_public_id: string;
+      consents: Consent[];
+    }>(`/consents/patients/${encodeURIComponent(patientIdentifier)}`, {}, true),
+
+  // FIX for your Netlify build error: ConsentDashboard.tsx calls this
+  getMyConsents: () =>
+    request<{
+      patient_id: string;
+      patient_public_id: string;
+      consents: Consent[];
+    }>(`/consents/me`, {}, true),
+
+  revokeConsent: (consentId: string) =>
+    request<{ status: string; consent_id: string; already_revoked?: boolean }>(
+      `/consents/${encodeURIComponent(consentId)}/revoke`,
+      { method: "POST" },
+      true
+    ),
+
+  // ======================
   // Doctor
+  // ======================
   getRecords: (patientIdentifier: string, scope: Scope) =>
     request<{
       patient_id: string;
@@ -144,12 +185,16 @@ export const api = {
       true
     ),
 
-  // Patient self-access (THIS should be auth=false if you want it public)
+  // ======================
+  // Patient
+  // ======================
+
+  // IMPORTANT: This MUST be auth=true since your backend requires Bearer auth (401 otherwise)
   selfRegisterPatient: (date_of_birth: string) =>
     request<{ id: string; public_id: string; guardian_user_id: string; created_at: string }>(
       "/patients/self/register",
       { method: "POST", body: JSON.stringify({ date_of_birth }) },
-      false
+      true
     ),
 
   getMyRecords: (scope: Scope) =>
@@ -160,46 +205,6 @@ export const api = {
       count: number;
       records: Array<{ issuer: string; pointer_id: string; resource: any }>;
     }>(`/records/me?scope=${encodeURIComponent(scope)}`, {}, true),
-
-  // Consents
-  getConsentsForPatient: (patientIdentifier: string) =>
-    request<{
-      patient_id: string;
-      patient_public_id: string;
-      consents: Array<{
-        id: string;
-        patient_id: string;
-        patient_public_id: string;
-        grantee_email: string;
-        scope: string;
-        expires_at: string;
-        revoked: boolean;
-        created_at: string;
-      }>;
-    }>(`/consents/patients/${encodeURIComponent(patientIdentifier)}`, {}, true),
-
-  getMyConsents: () =>
-    request<{
-      patient_id: string;
-      patient_public_id: string;
-      consents: Array<{
-        id: string;
-        patient_id: string;
-        patient_public_id: string;
-        grantee_email: string;
-        scope: string;
-        expires_at: string;
-        revoked: boolean;
-        created_at: string;
-      }>;
-    }>(`/consents/me`, {}, true),
-
-  revokeConsent: (consentId: string) =>
-    request<{ status: string; consent_id: string; already_revoked?: boolean }>(
-      `/consents/${encodeURIComponent(consentId)}/revoke`,
-      { method: "POST" },
-      true
-    ),
 
   addMyPointer: (payload: { scope: Scope; fhir_resource_id: string; issuer?: string }) =>
     request<{ status: string; pointer_id: string; record_type: string }>(
