@@ -29,39 +29,44 @@ async function request<T>(
   auth: boolean = true
 ): Promise<T> {
   const headers: Record<string, string> = {
-    Accept: "application/json",
-    ...(options.headers ? (options.headers as Record<string, string>) : {}),
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
   };
-
-  // Attach JSON content-type if body is present and caller didn't specify it
-  if (options.body && !("Content-Type" in headers)) {
-    headers["Content-Type"] = "application/json";
-  }
 
   if (auth) {
     const token = getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
-  // Parse response body (json preferred, fallback to text)
-  let data: any = null;
-  const ct = res.headers.get("content-type") || "";
+  let res: Response;
   try {
-    if (ct.includes("application/json")) data = await res.json();
-    else data = await res.text();
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      // NOTE: keep default mode="cors"
+    });
+  } catch (e: any) {
+    // This is what you usually see when CORS blocks or DNS fails:
+    throw new Error(
+      `Network/CORS error calling ${API_BASE}${path}. ` +
+        `Check NEXT_PUBLIC_API_BASE and backend CORS. ` +
+        (e?.message ? `(${e.message})` : "")
+    );
+  }
+
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
   } catch {
-    // ignore parse errors
+    data = text;
   }
 
   if (!res.ok) {
     const msg =
-      (data && typeof data === "object" && (data.detail || data.message)) ||
-      (typeof data === "string" && data) ||
+      data?.detail ||
+      data?.message ||
+      (typeof data === "string" ? data : null) ||
       `Request failed (${res.status})`;
     throw new Error(msg);
   }
@@ -91,40 +96,42 @@ export const api = {
       false
     ),
 
-  // Guardian: create patient
-  createPatient: (payload: { full_name: string; date_of_birth: string }) =>
+  // Guardian
+  createPatient: () =>
     request<{ id: string; public_id: string; guardian_user_id: string; created_at: string }>(
       "/patients",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      },
+      { method: "POST", body: JSON.stringify({}) },
       true
     ),
 
-  // Guardian/Doctor/Patient: consents
+  addPointer: (
+    patientIdentifier: string,
+    payload: {
+      record_type: "immunization" | "allergy" | "condition";
+      fhir_base_url: string;
+      fhir_resource_type: string;
+      fhir_resource_id: string;
+      issuer: string;
+    }
+  ) =>
+    request<{ status: string; pointer_id: string; patient_id: string; patient_public_id: string }>(
+      `/patients/${encodeURIComponent(patientIdentifier)}/pointers`,
+      { method: "POST", body: JSON.stringify(payload) },
+      true
+    ),
+
   grantConsent: (
-    patientPublicId: string,
+    patientIdentifier: string,
     payload: { grantee_email: string; scope: Scope; expires_at: string }
   ) =>
-    request<{ status: string; consent_id: string }>(
-      `/consents/patients/${encodeURIComponent(patientPublicId)}`,
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      },
+    request<{ status: string; consent_id: string; patient_id: string; patient_public_id: string }>(
+      `/consents/patients/${encodeURIComponent(patientIdentifier)}`,
+      { method: "POST", body: JSON.stringify(payload) },
       true
     ),
 
-  listConsentsForPatient: (patientPublicId: string) =>
-    request<{ consents: any[] }>(
-      `/consents/patients/${encodeURIComponent(patientPublicId)}`,
-      {},
-      true
-    ),
-
-  // Doctor: fetch patient records (with consent)
-  getPatientRecords: (patientIdentifier: string, scope: Scope) =>
+  // Doctor
+  getRecords: (patientIdentifier: string, scope: Scope) =>
     request<{
       patient_id: string;
       patient_public_id?: string;
@@ -132,22 +139,19 @@ export const api = {
       count: number;
       records: Array<{ issuer: string; pointer_id: string; resource: any }>;
     }>(
-      `/records/patients/${encodeURIComponent(
-        patientIdentifier
-      )}?scope=${encodeURIComponent(scope)}`,
+      `/records/patients/${encodeURIComponent(patientIdentifier)}?scope=${encodeURIComponent(scope)}`,
       {},
       true
     ),
 
-  // Patient self-access (requires patient login)
+  // Patient self-access (THIS should be auth=false if you want it public)
   selfRegisterPatient: (date_of_birth: string) =>
     request<{ id: string; public_id: string; guardian_user_id: string; created_at: string }>(
       "/patients/self/register",
       { method: "POST", body: JSON.stringify({ date_of_birth }) },
-      true
+      false
     ),
 
-  // Patient: fetch own records
   getMyRecords: (scope: Scope) =>
     request<{
       patient_id: string;
@@ -157,7 +161,46 @@ export const api = {
       records: Array<{ issuer: string; pointer_id: string; resource: any }>;
     }>(`/records/me?scope=${encodeURIComponent(scope)}`, {}, true),
 
-  // Patient: add pointer
+  // Consents
+  getConsentsForPatient: (patientIdentifier: string) =>
+    request<{
+      patient_id: string;
+      patient_public_id: string;
+      consents: Array<{
+        id: string;
+        patient_id: string;
+        patient_public_id: string;
+        grantee_email: string;
+        scope: string;
+        expires_at: string;
+        revoked: boolean;
+        created_at: string;
+      }>;
+    }>(`/consents/patients/${encodeURIComponent(patientIdentifier)}`, {}, true),
+
+  getMyConsents: () =>
+    request<{
+      patient_id: string;
+      patient_public_id: string;
+      consents: Array<{
+        id: string;
+        patient_id: string;
+        patient_public_id: string;
+        grantee_email: string;
+        scope: string;
+        expires_at: string;
+        revoked: boolean;
+        created_at: string;
+      }>;
+    }>(`/consents/me`, {}, true),
+
+  revokeConsent: (consentId: string) =>
+    request<{ status: string; consent_id: string; already_revoked?: boolean }>(
+      `/consents/${encodeURIComponent(consentId)}/revoke`,
+      { method: "POST" },
+      true
+    ),
+
   addMyPointer: (payload: { scope: Scope; fhir_resource_id: string; issuer?: string }) =>
     request<{ status: string; pointer_id: string; record_type: string }>(
       `/records/me/pointers`,
@@ -165,7 +208,6 @@ export const api = {
       true
     ),
 
-  // Patient: create + link from catalog
   createFromCatalog: (payload: { scope: Scope; display: string; issuer?: string }) =>
     request<{ status: string; fhir_resource_type: string; fhir_resource_id: string; pointer_id: string }>(
       `/records/me/catalog/create`,
