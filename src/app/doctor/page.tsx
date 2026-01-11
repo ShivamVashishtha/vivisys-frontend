@@ -94,7 +94,7 @@ export default function DoctorPage() {
       right={<span className="pill">Scope: {scope}</span>}
     >
       {/* Search */}
-      <div className="card">
+      <div className="card" id="lookup">
         <div className="card-h">
           <div className="text-sm font-semibold">Lookup</div>
           <div className="text-xs text-slate-500">
@@ -134,8 +134,12 @@ export default function DoctorPage() {
           </div>
 
           {err ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {err}
+            <div className="callout-warning">
+              <div className="font-semibold">Request failed</div>
+              <div className="mt-1">{err}</div>
+              <div className="mt-2 text-xs opacity-80">
+                If this is a 403, ask the patient to grant consent for this scope (or scope: all).
+              </div>
             </div>
           ) : null}
         </div>
@@ -143,7 +147,8 @@ export default function DoctorPage() {
 
       {/* Results */}
       {result ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+        <div id="records" className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+
           {/* Table */}
           <div className="card overflow-hidden">
             <div className="card-h flex items-center justify-between">
@@ -158,13 +163,13 @@ export default function DoctorPage() {
             </div>
 
             <div className="overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 bg-white border-b border-slate-100">
-                  <tr className="text-left text-slate-600">
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Type</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Issuer</th>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Issuer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -180,14 +185,14 @@ export default function DoctorPage() {
                         ].join(" ")}
                         onClick={() => setSelected(idx)}
                       >
-                        <td className="px-4 py-3 whitespace-nowrap">{s.date}</td>
+                        <td className="whitespace-nowrap">{s.date}</td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{s.type}</div>
                           <div className="text-xs text-slate-500">
                             {r.resource?.resourceType} / {s.id}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="whitespace-nowrap">
                           <span className="pill">{s.status}</span>
                         </td>
                         <td className="px-4 py-3">
@@ -230,7 +235,7 @@ export default function DoctorPage() {
 
             <div className="p-4">
               {selectedRecord ? (
-                <pre className="h-[520px] overflow-auto rounded-2xl border border-slate-200 bg-slate-950 text-slate-100 p-4 text-xs leading-relaxed">
+                <pre className="code h-[520px]">
 {JSON.stringify(selectedRecord.resource, null, 2)}
                 </pre>
               ) : (
