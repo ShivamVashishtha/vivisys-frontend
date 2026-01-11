@@ -141,14 +141,32 @@ export default function PatientHospitalsPage() {
     }
   }
 
-  function chooseHospital(h: CMSHospital) {
+  async function chooseHospital(h: CMSHospital) {
     setSelected(h);
+  
+    // keep local fallback (optional)
     try {
       localStorage.setItem(SELECTED_HOSPITAL_KEY, JSON.stringify(h));
-    } catch {
-      // ignore
+    } catch {}
+  
+    // persist to backend (new)
+    try {
+      await api.setMyHospitalSelection({
+        npi: h.npi,
+        name: h.name,
+        telephone_number: h.address?.telephone_number ?? null,
+        line1: h.address?.line1 ?? null,
+        line2: h.address?.line2 ?? null,
+        city: h.address?.city ?? null,
+        state: h.address?.state ?? null,
+        postal_code: h.address?.postal_code ?? null,
+        taxonomy_desc: primaryTaxonomy(h),
+      });
+    } catch (e: any) {
+      setErr(e?.message ?? "Could not save hospital selection");
     }
   }
+
 
   function clearSelection() {
     setSelected(null);
