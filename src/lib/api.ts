@@ -219,4 +219,47 @@ export const api = {
       { method: "POST", body: JSON.stringify(payload) },
       true
     ),
+
+    // ======================
+  // Hospitals (CMS NPI Registry)
+  // ======================
+  searchHospitalsCMS: (params: {
+    name: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    limit?: number;
+    skip?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    qs.set("name", params.name);
+    if (params.city) qs.set("city", params.city);
+    if (params.state) qs.set("state", params.state);
+    if (params.postal_code) qs.set("postal_code", params.postal_code);
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.skip != null) qs.set("skip", String(params.skip));
+
+    return request<{
+      source: string;
+      result_count: number;
+      results: Array<{
+        npi: string;
+        name: string;
+        enumeration_type: string;
+        status: string;
+        last_updated?: string;
+        address?: {
+          line1?: string;
+          line2?: string;
+          city?: string;
+          state?: string;
+          postal_code?: string;
+          country_code?: string;
+          telephone_number?: string;
+        };
+        taxonomies?: any[];
+      }>;
+    }>(`/hospitals/cms/search?${qs.toString()}`, {}, false);
+  },
+
 };
