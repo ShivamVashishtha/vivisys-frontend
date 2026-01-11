@@ -22,6 +22,9 @@ export default function GuardianPage() {
   const [doctorEmail, setDoctorEmail] = useState("doctor@test.com");
   const [scope, setScope] = useState<Scope>("immunizations");
   const [days, setDays] = useState(7);
+  const [sourceMode, setSourceMode] = useState<"hospital" | "other">("other");
+  const [hospitalName, setHospitalName] = useState<string>("");
+
 
   const patientReady = useMemo(() => patientIdentifier.trim().length > 0, [patientIdentifier]);
 
@@ -171,12 +174,33 @@ export default function GuardianPage() {
 
             <div className="md:col-span-1">
               <div className="label">Issuer</div>
-              <input
+              <select
                 className="input mt-2"
-                value={issuer}
-                onChange={(e) => setIssuer(e.target.value)}
-                placeholder="Hospital / Clinic name"
-              />
+                value={sourceMode}
+                onChange={(e) => {
+                  const v = e.target.value as "hospital" | "other";
+                  setSourceMode(v);
+                  if (v === "hospital" && hospitalName) {
+                    setIssuer(hospitalName);
+                  }
+                }}
+              >
+                <option value="other">Other / Self-reported</option>
+                <option value="hospital">Hospital (manual)</option>
+              </select>
+              
+              {sourceMode === "hospital" && (
+                <input
+                  className="input mt-2"
+                  placeholder="Hospital name"
+                  value={hospitalName}
+                  onChange={(e) => {
+                    setHospitalName(e.target.value);
+                    setIssuer(e.target.value);
+                  }}
+                />
+              )}
+
             </div>
           </div>
 
