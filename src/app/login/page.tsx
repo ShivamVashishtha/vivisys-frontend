@@ -21,8 +21,25 @@ export default function LoginPage() {
     setErr(null);
     setLoading(true);
     try {
-      const fn = mode === "register" ? api.register : api.login;
-      const res = await api.login(email, password, role);
+    async function submit() {
+      setErr(null);
+      setLoading(true);
+      try {
+        const fn = mode === "register" ? api.register : api.login;
+        const res = await fn(email, password, role);   // ✅ use fn
+        setToken(res.access_token);
+    
+        if (role === "guardian") router.push("/guardian");
+        else if (role === "doctor") router.push("/doctor");
+        else if (role === "patient") router.push("/patient");
+        else router.push("/");
+      } catch (e: any) {
+        setErr(e.message ?? "Failed");
+      } finally {
+        setLoading(false);
+      }
+    }
+
       setToken(res.access_token);
 
       if (role === "guardian") router.push("/guardian");
