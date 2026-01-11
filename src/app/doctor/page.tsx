@@ -52,6 +52,46 @@ function resourceSummary(resource: any) {
   };
 }
 
+function summarizeForHeader(resource: any) {
+  const rt = resource?.resourceType ?? "Resource";
+
+  const base = {
+    resourceType: rt,
+    id: resource?.id ?? "—",
+    status:
+      resource?.status ??
+      resource?.clinicalStatus?.text ??
+      resource?.clinicalStatus?.coding?.[0]?.code ??
+      "—",
+    date:
+      resource?.occurrenceDateTime ??
+      resource?.recordedDate ??
+      resource?.onsetDateTime ??
+      resource?.meta?.lastUpdated ??
+      "",
+    title:
+      resource?.vaccineCode?.text ??
+      resource?.code?.text ??
+      resource?.medicationCodeableConcept?.text ??
+      rt,
+  };
+
+  return {
+    ...base,
+    dateLabel: formatDate(base.date),
+  };
+}
+
+async function copyText(label: string, value: string, onMsg?: (m: string) => void) {
+  try {
+    await navigator.clipboard.writeText(value);
+    onMsg?.(`✅ Copied ${label}`);
+  } catch {
+    onMsg?.(`❌ Could not copy ${label}`);
+  }
+}
+
+
 export default function DoctorPage() {
   const router = useRouter();
 
@@ -61,6 +101,8 @@ export default function DoctorPage() {
   const [err, setErr] = useState<string>("");
   const [selected, setSelected] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  
+  const [detailMsg, setDetailMsg] = useState<string>("");
 
   const records: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
   const selectedRecord = records[selected];
@@ -232,16 +274,93 @@ export default function DoctorPage() {
                 )}
               </div>
             </div>
-
+            
             <div className="p-4">
               {selectedRecord ? (
-                <pre className="code h-[520px]">
-{JSON.stringify(selectedRecord.resource, null, 2)}
-                </pre>
+                <>
+                  {(() => {
+                    const h = summarizeForHeader(selectedRecord.resource);
+                    return (
+                      <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 truncate">
+                              {h.title}
+                            </div>
+            
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-600">
+                              <span className="pill">{h.resourceType}</span>
+                              <span className="pill">Status: {h.status}</span>
+                              <span className="pill">Date: {h.dateLabel}</span>
+                            </div>
+            
+                            <div className="mt-2 text-xs text-slate-600">
+                              <span className="font-semibold">Issuer:</span>{" "}
+                              <span className="text-slate-800">
+                                {selectedRecord.issuer}
+                              </span>
+                            </div>
+            
+                            <div className="mt-1 text-xs text-slate-600">
+                              <span className="font-semibold">FHIR ID:</span>{" "}
+                              <span className="font-mono text-slate-800">{h.id}</span>
+                            </div>
+            
+                            <div className="mt-1 text-xs text-slate-600">
+                              <span className="font-semibold">Pointer:</span>{" "}
+                              <span className="font-mono text-slate-800">
+                                {selectedRecord.pointer_id}
+                              </span>
+                            </div>
+                          </div>
+            
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <button
+                              className="btn-ghost"
+                              onClick={() =>
+                                copyText("FHIR ID", String(h.id), setDetailMsg)
+                              }
+                            >
+                              Copy FHIR ID
+                            </button>
+            
+                            <button
+                              className="btn-ghost"
+                              onClick={() =>
+                                copyText(
+                                  "JSON",
+                                  JSON.stringify(
+                                    selectedRecord.resource,
+                                    null,
+                                    2
+                                  ),
+                                  setDetailMsg
+                                )
+                              }
+                            >
+                              Copy JSON
+                            </button>
+                          </div>
+                        </div>
+            
+                        {detailMsg ? (
+                          <div className="mt-2 text-xs text-slate-600">
+                            {detailMsg}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+            
+                  <pre className="code h-[520px]">
+            {JSON.stringify(selectedRecord.resource, null, 2)}
+                  </pre>
+                </>
               ) : (
                 <div className="text-sm text-slate-600">No selection.</div>
               )}
             </div>
+
           </div>
         </div>
       ) : null}
