@@ -157,6 +157,13 @@ export default function PatientPage() {
   const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
   const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
   const [catIssuer, setCatIssuer] = useState("Self (Patient)");
+  const [hospitalSource, setHospitalSource] = useState<{
+  name: string;
+  npi?: string;
+} | null>(null);
+
+  const [sourceMode, setSourceMode] = useState<"hospital" | "other">("hospital");
+
   const [catMsg, setCatMsg] = useState("");
 
   const [detailMsg, setDetailMsg] = useState<string>("");
@@ -165,9 +172,25 @@ export default function PatientPage() {
   const selectedRecord = records[selected];
 
   useEffect(() => {
-    // On page load: if token exists, treat as authed
     setAuthed(!!getToken());
+  
+    (async () => {
+      try {
+        const h = await api.getMyHospitalSelection();
+        if (h) {
+          setHospitalSource({
+            name: h.hospital_name,
+            npi: h.hospital_npi,
+          });
+          setCatIssuer(h.hospital_name);
+          setPtrIssuer(h.hospital_name);
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
+
 
   function handleAuthFailure(message?: string) {
     clearToken();
@@ -526,11 +549,36 @@ export default function PatientPage() {
                 ))}
               </select>
             </div>
-
             <div>
-              <div className="label">Issuer</div>
-              <input className="input mt-2" value={catIssuer} onChange={(e) => setCatIssuer(e.target.value)} />
+              <div className="label">Source</div>
+            
+              <select
+                className="input mt-2"
+                value={sourceMode}
+                onChange={(e) => {
+                  const v = e.target.value as "hospital" | "other";
+                  setSourceMode(v);
+                  if (v === "hospital" && hospitalSource) {
+                    setCatIssuer(hospitalSource.name);
+                  }
+                }}
+              >
+                <option value="hospital" disabled={!hospitalSource}>
+                  Hospital{hospitalSource ? ` (${hospitalSource.name})` : " (none selected)"}
+                </option>
+                <option value="other">Other / Self-reported</option>
+              </select>
+            
+              {sourceMode === "other" && (
+                <input
+                  className="input mt-2"
+                  placeholder="Enter source (e.g. Self, Clinic name)"
+                  value={catIssuer}
+                  onChange={(e) => setCatIssuer(e.target.value)}
+                />
+              )}
             </div>
+
 
             <button className="btn-primary" disabled={loading} onClick={createAndLinkFromCatalog}>
               {loading ? "Working..." : "Create & Link"}
@@ -574,14 +622,35 @@ export default function PatientPage() {
             </div>
 
             <div>
-              <div className="label">Issuer</div>
-              <input
+              <div className="label">Source</div>
+            
+              <select
                 className="input mt-2"
-                value={ptrIssuer}
-                onChange={(e) => setPtrIssuer(e.target.value)}
-                placeholder="Hospital / Clinic name"
-              />
+                value={sourceMode}
+                onChange={(e) => {
+                  const v = e.target.value as "hospital" | "other";
+                  setSourceMode(v);
+                  if (v === "hospital" && hospitalSource) {
+                    setPtrIssuer(hospitalSource.name);
+                  }
+                }}
+              >
+                <option value="hospital" disabled={!hospitalSource}>
+                  Hospital{hospitalSource ? ` (${hospitalSource.name})` : " (none selected)"}
+                </option>
+                <option value="other">Other / Self-reported</option>
+              </select>
+            
+              {sourceMode === "other" && (
+                <input
+                  className="input mt-2"
+                  placeholder="Enter source (e.g. Self, Clinic name)"
+                  value={catIssuer}
+                  onChange={(e) => setPtrIssuer(e.target.value)}
+                />
+              )}
             </div>
+
 
             <button className="btn-primary" disabled={loading} onClick={addMyPointer}>
               {loading ? "Working..." : "Add"}
