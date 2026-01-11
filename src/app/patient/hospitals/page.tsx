@@ -84,14 +84,43 @@ export default function PatientHospitalsPage() {
   const canSearch = useMemo(() => debouncedName.trim().length >= 2, [debouncedName]);
 
   useEffect(() => {
-    // Load previously selected hospital (if any)
-    try {
-      const raw = localStorage.getItem(SELECTED_HOSPITAL_KEY);
-      if (raw) setSelected(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
+    (async () => {
+      // 1️⃣ Try backend first (authoritative)
+      try {
+        const saved = await api.getMyHospitalSelection();
+        if (saved) {
+          const h: CMSHospital = {
+            npi: saved.hospital_npi,
+            name: saved.hospital_name,
+            address: {
+              line1: saved.address_line1 ?? undefined,
+              line2: saved.address_line2 ?? undefined,
+              city: saved.city ?? undefined,
+              state: saved.state ?? undefined,
+              postal_code: saved.postal_code ?? undefined,
+              telephone_number: saved.hospital_phone ?? undefined,
+            },
+            taxonomies: saved.taxonomy_desc
+              ? [{ desc: saved.taxonomy_desc, primary: true }]
+              : [],
+          };
+          setSelected(h);
+          return; // stop if backend has data
+        }
+      } catch {
+        // ignore backend errors and fallback
+      }
+  
+      // 2️⃣ Fallback to localStorage
+      try {
+        const raw = localStorage.getItem(SELECTED_HOSPITAL_KEY);
+        if (raw) setSelected(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
+
 
   useEffect(() => {
     // Auto-search when inputs change (name must be present)
