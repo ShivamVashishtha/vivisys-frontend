@@ -262,4 +262,47 @@ export const api = {
     }>(`/hospitals/cms/search?${qs.toString()}`, {}, false);
   },
 
+
+    // ======================
+  // Patient hospital selection
+  // ======================
+  getMyHospitalSelection: () =>
+    request<
+      | null
+      | {
+          hospital_npi: string;
+          hospital_name: string;
+          hospital_phone?: string | null;
+          address_line1?: string | null;
+          address_line2?: string | null;
+          city?: string | null;
+          state?: string | null;
+          postal_code?: string | null;
+          taxonomy_desc?: string | null;
+        }
+    >(`/patients/me/hospital`, {}, true),
+
+  setMyHospitalSelection: (payload: {
+    npi: string;
+    name: string;
+    telephone_number?: string | null;
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    taxonomy_desc?: string | null;
+  }) =>
+    request<{
+      hospital_npi: string;
+      hospital_name: string;
+      hospital_phone?: string | null;
+      address_line1?: string | null;
+      address_line2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      postal_code?: string | null;
+      taxonomy_desc?: string | null;
+    }>(`/patients/me/hospital`, { method: "POST", body: JSON.stringify(payload) }, true),
+
 };
