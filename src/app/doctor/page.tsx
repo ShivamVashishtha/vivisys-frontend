@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { api, clearToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
+import RecordsViewer from "@/app/_components/RecordsViewer";
+
 
 type RecordItem = {
   issuer: string;
@@ -143,70 +145,13 @@ export default function DoctorPage() {
 
       {/* Results */}
       {result ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
-          {/* Table */}
-          <div className="card overflow-hidden">
-            <div className="card-h flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold">Records</div>
-                <div className="text-xs text-slate-500">
-                  patient_id: <span className="font-mono">{result.patient_id}</span> ·{" "}
-                  {result.count} record(s)
-                </div>
-              </div>
-              <span className="pill">{result.scope}</span>
-            </div>
+        <RecordsViewer
+          records={result.records}
+          scope={result.scope}
+          patientPublicId={result.patient_public_id}
+        />
+      ) : null}
 
-            <div className="overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 bg-white border-b border-slate-100">
-                  <tr className="text-left text-slate-600">
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Type</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Issuer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((r, idx) => {
-                    const s = resourceSummary(r.resource);
-                    const active = idx === selected;
-                    return (
-                      <tr
-                        key={r.pointer_id}
-                        className={[
-                          "border-b border-slate-100 cursor-pointer",
-                          active ? "bg-slate-50" : "hover:bg-slate-50/60",
-                        ].join(" ")}
-                        onClick={() => setSelected(idx)}
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap">{s.date}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{s.type}</div>
-                          <div className="text-xs text-slate-500">
-                            {r.resource?.resourceType} / {s.id}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="pill">{s.status}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-slate-900">{r.issuer}</div>
-                          <div className="text-xs text-slate-500 font-mono">
-                            ptr:{r.pointer_id.slice(0, 8)}…
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {records.length === 0 ? (
-                    <tr>
-                      <td className="px-4 py-10 text-slate-500" colSpan={4}>
-                        No records returned.
-                      </td>
-                    </tr>
-                  ) : null}
                 </tbody>
               </table>
             </div>
