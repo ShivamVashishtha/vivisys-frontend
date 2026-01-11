@@ -18,6 +18,45 @@ type RecordItem = {
   resource: any;
 };
 
+type CMSHospital = {
+  npi: string;
+  name: string;
+  status?: string;
+  last_updated?: string;
+  address?: {
+    line1?: string;
+    line2?: string | null;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country_code?: string;
+    telephone_number?: string;
+  };
+  taxonomies?: Array<{
+    code?: string;
+    desc?: string;
+    primary?: boolean;
+    state?: string;
+  }>;
+};
+
+function formatAddress(a?: CMSHospital["address"]) {
+  if (!a) return "—";
+  const parts = [
+    a.line1,
+    a.line2 || undefined,
+    [a.city, a.state, a.postal_code].filter(Boolean).join(", "),
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function primaryTaxonomy(h: CMSHospital) {
+  const tx = h.taxonomies || [];
+  const primary = tx.find((t) => t.primary) || tx[0];
+  return primary?.desc || primary?.code || "—";
+}
+
+
 function formatDate(s?: string) {
   if (!s) return "—";
   const d = new Date(s);
@@ -154,6 +193,20 @@ export default function PatientPage() {
   const [ptrIssuer, setPtrIssuer] = useState("Self (Patient)");
   const [ptrMsg, setPtrMsg] = useState("");
 
+    // Selected hospital (persisted on backend)
+  const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
+  
+  // Modal UI
+  const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
+  const [hName, setHName] = useState("");
+  const [hCity, setHCity] = useState("");
+  const [hState, setHState] = useState("");
+  const [hPostal, setHPostal] = useState("");
+  const [hLoading, setHLoading] = useState(false);
+  const [hErr, setHErr] = useState("");
+  const [hResults, setHResults] = useState<CMSHospital[]>([]);
+
+
   const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
   const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
   const [catIssuer, setCatIssuer] = useState("Self (Patient)");
@@ -191,6 +244,23 @@ export default function PatientPage() {
     })();
   }, []);
 
+  useEffect(() => {
+  (async () => {
+    try {
+      const saved = await api.getMyHospitalSelection();
+      if (saved) {
+        setHospitalSource({
+          name: saved.hospital_name,
+          npi: saved.hospital_npi,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  })();
+}, []);
+
+
 
   function handleAuthFailure(message?: string) {
     clearToken();
@@ -208,6 +278,63 @@ export default function PatientPage() {
     setResult(null);
     router.push("/login");
   }
+
+  async function searchHospitals() {
+  setHErr("");
+  setHResults([]);
+
+  if (!hName.trim() || hName.trim().length < 2) {
+    setHErr("Enter at least 2 characters in Hospital name.");
+    return;
+  }
+
+  setHLoading(true);
+  try {
+    const res = await api.searchHospitalsCMS({
+      name: hName.trim(),
+      city: hCity.trim() || undefined,
+      state: hState.trim() ? hState.trim().toUpperCase() : undefined,
+      postal_code: hPostal.trim() || undefined,
+      limit: 25,
+      skip: 0,
+    });
+
+    const results = (res.results || []).sort((a: any, b: any) => {
+      const ah = String(primaryTaxonomy(a)).toLowerCase().includes("hospital") ? 0 : 1;
+      const bh = String(primaryTaxonomy(b)).toLowerCase().includes("hospital") ? 0 : 1;
+      return ah - bh;
+    });
+
+    setHResults(results);
+    if (!results.length) setHErr("No matches found. Try a broader name or remove filters.");
+  } catch (e: any) {
+    setHErr(e?.message ?? "Search failed");
+  } finally {
+    setHLoading(false);
+  }
+}
+
+async function selectHospital(h: CMSHospital) {
+  setHErr("");
+  try {
+    await api.setMyHospitalSelection({
+      npi: h.npi,
+      name: h.name,
+      telephone_number: h.address?.telephone_number ?? null,
+      line1: h.address?.line1 ?? null,
+      line2: h.address?.line2 ?? null,
+      city: h.address?.city ?? null,
+      state: h.address?.state ?? null,
+      postal_code: h.address?.postal_code ?? null,
+      taxonomy_desc: primaryTaxonomy(h),
+    });
+
+    setHospitalSource({ name: h.name, npi: h.npi });
+    setHospitalModalOpen(false);
+  } catch (e: any) {
+    setHErr(e?.message ?? "Could not save hospital selection");
+  }
+}
 
   // ===== NEW: Patient login =====
   async function loginPatient() {
@@ -548,6 +675,41 @@ export default function PatientPage() {
         <ConsentDashboard mode="patient" />
       </div>
 
+      {/* Hospital source */}
+      <div className="card">
+        <div className="card-h flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">Default hospital source</div>
+            <div className="text-xs text-slate-500">
+              Used as the source for new records unless you choose “Other / Self-reported”.
+            </div>
+          </div>
+      
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              setHErr("");
+              setHResults([]);
+              setHospitalModalOpen(true);
+            }}
+          >
+            {hospitalSource ? "Change" : "Select"}
+          </button>
+        </div>
+      
+        <div className="card-b">
+          {hospitalSource ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="pill-success">{hospitalSource.name}</span>
+              {hospitalSource.npi ? <span className="pill">NPI: {hospitalSource.npi}</span> : null}
+            </div>
+          ) : (
+            <div className="empty">No hospital selected. Select one to enable “Hospital” as a source.</div>
+          )}
+        </div>
+      </div>
+
+      
       {/* Add from catalog */}
       <div className="card">
         <div className="card-h">
@@ -904,6 +1066,142 @@ export default function PatientPage() {
       ) : null}
 
       <div id="audit" />
+
+    {hospitalModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* backdrop */}
+        <div
+          className="absolute inset-0 bg-black/30"
+          onClick={() => setHospitalModalOpen(false)}
+        />
+    
+        {/* panel */}
+        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Find your hospital</div>
+              <div className="text-xs text-slate-500">
+                Search CMS NPI Registry by name, then narrow by city/state/ZIP.
+              </div>
+            </div>
+            <button className="btn-ghost" onClick={() => setHospitalModalOpen(false)}>
+              Close
+            </button>
+          </div>
+    
+          <div className="p-4 grid gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_110px_130px_140px] gap-2 items-end">
+              <div>
+                <div className="label">Hospital name</div>
+                <input
+                  className="input mt-2"
+                  value={hName}
+                  onChange={(e) => setHName(e.target.value)}
+                  placeholder="Unity Hospital"
+                />
+              </div>
+    
+              <div>
+                <div className="label">City</div>
+                <input
+                  className="input mt-2"
+                  value={hCity}
+                  onChange={(e) => setHCity(e.target.value)}
+                  placeholder="Chicago"
+                />
+              </div>
+    
+              <div>
+                <div className="label">State</div>
+                <input
+                  className="input mt-2"
+                  value={hState}
+                  onChange={(e) => setHState(e.target.value)}
+                  placeholder="IL"
+                />
+              </div>
+    
+              <div>
+                <div className="label">ZIP</div>
+                <input
+                  className="input mt-2"
+                  value={hPostal}
+                  onChange={(e) => setHPostal(e.target.value)}
+                  placeholder="60611"
+                />
+              </div>
+    
+              <button className="btn-primary w-full" onClick={searchHospitals} disabled={hLoading}>
+                {hLoading ? "Searching..." : "Search"}
+              </button>
+            </div>
+    
+            {hErr ? <div className="callout-warning">{hErr}</div> : null}
+    
+            <div className="rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="max-h-[420px] overflow-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Hospital</th>
+                      <th>Address</th>
+                      <th>Type</th>
+                      <th>NPI</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hResults.length ? (
+                      hResults.map((h) => {
+                        const active = hospitalSource?.npi === h.npi;
+                        return (
+                          <tr key={h.npi}>
+                            <td>
+                              <div className="font-medium text-slate-900">{h.name}</div>
+                              <div className="text-xs text-slate-500">
+                                {h.address?.telephone_number ? `☎ ${h.address.telephone_number}` : " "}
+                              </div>
+                            </td>
+                            <td className="text-slate-700">{formatAddress(h.address)}</td>
+                            <td>
+                              {String(primaryTaxonomy(h)).toLowerCase().includes("hospital") ? (
+                                <span className="pill-success">{primaryTaxonomy(h)}</span>
+                              ) : (
+                                <span className="pill">{primaryTaxonomy(h)}</span>
+                              )}
+                            </td>
+                            <td className="font-mono text-xs">{h.npi}</td>
+                            <td className="text-right">
+                              <button
+                                className={active ? "btn-secondary" : "btn-primary"}
+                                onClick={() => selectHospital(h)}
+                              >
+                                {active ? "Selected" : "Select"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="text-slate-500">
+                          Enter a name and search to see results.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+    
+              <div className="p-3 text-xs text-slate-500 border-t border-slate-100">
+                Data source: CMS NPI Registry (NPI-2 organizations). Confirm using address/phone.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null}
+
     </AppShell>
   );
 }
