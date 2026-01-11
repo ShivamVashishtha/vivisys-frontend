@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { api, clearToken, Scope } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, clearToken, getToken, setToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
 import ConsentDashboard from "@/app/_components/ConsentDashboard";
@@ -11,7 +11,6 @@ const CATALOG = {
   conditions: ["Asthma", "Diabetes mellitus", "Hypertension", "Migraine", "Anxiety disorder"],
   allergies: ["Peanut", "Penicillin", "Latex", "Shellfish", "Pollen"],
 } as const;
-
 
 type RecordItem = {
   issuer: string;
@@ -66,15 +65,30 @@ function resourceSummary(resource: any) {
   };
 }
 
-// Helper to generate a default expires_at for the consent form (7 days from now)
 function defaultExpiresLocal(): string {
   const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  // datetime-local expects "YYYY-MM-DDTHH:MM"
   return d.toISOString().slice(0, 16);
+}
+
+// Best-effort way to detect auth failures from your backend messages
+function isAuthErrorMessage(msg?: string) {
+  const m = (msg || "").toLowerCase();
+  return (
+    m.includes("not authenticated") ||
+    m.includes("unauthorized") ||
+    m.includes("401") ||
+    m.includes("invalid token") ||
+    m.includes("token")
+  );
 }
 
 export default function PatientPage() {
   const router = useRouter();
+
+  // ===== Auth (NEW) =====
+  const [authed, setAuthed] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>("patient@test.com");
+  const [password, setPassword] = useState<string>("patient123");
 
   // Self-registration
   const [dob, setDob] = useState("1990-01-01");
@@ -85,7 +99,7 @@ export default function PatientPage() {
   const [result, setResult] = useState<any>(null);
   const [selected, setSelected] = useState<number>(0);
 
-  // Global error / loading (used for major actions)
+  // Global error / loading
   const [err, setErr] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
@@ -105,13 +119,58 @@ export default function PatientPage() {
   const [catIssuer, setCatIssuer] = useState("Self (Patient)");
   const [catMsg, setCatMsg] = useState("");
 
-
   const records: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
   const selectedRecord = records[selected];
 
+  useEffect(() => {
+    // On page load: if token exists, treat as authed
+    setAuthed(!!getToken());
+  }, []);
+
+  function handleAuthFailure(message?: string) {
+    clearToken();
+    setAuthed(false);
+    setProfile(null);
+    setResult(null);
+    setSelected(0);
+    setErr(message || "Not authenticated. Please log in again.");
+  }
+
   async function logout() {
     clearToken();
+    setAuthed(false);
+    setProfile(null);
+    setResult(null);
     router.push("/login");
+  }
+
+  // ===== NEW: Patient login =====
+  async function loginPatient() {
+    setErr("");
+    setConsentMsg("");
+    setPtrMsg("");
+    setCatMsg("");
+    setLoading(true);
+    try {
+      const res = await api.login(email.trim(), password, "patient");
+      setToken(res.access_token);
+      setAuthed(true);
+    } catch (e: any) {
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function requireAuth() {
+    const t = getToken();
+    if (!t) {
+      setErr("Not authenticated. Please log in as a PATIENT first (top of page).");
+      return false;
+    }
+    return true;
   }
 
   async function registerSelf() {
@@ -119,10 +178,14 @@ export default function PatientPage() {
     setConsentMsg("");
     setLoading(true);
     try {
+      if (!requireAuth()) return;
+
       const p = await api.selfRegisterPatient(dob);
       setProfile({ id: p.id, public_id: p.public_id });
     } catch (e: any) {
-      setErr(e.message ?? "Failed");
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -135,13 +198,17 @@ export default function PatientPage() {
     setSelected(0);
     setLoading(true);
     try {
+      if (!requireAuth()) return;
+
       const res = await api.getMyRecords(scope);
       setResult(res);
       if (res?.patient_public_id) {
         setProfile({ id: res.patient_id, public_id: res.patient_public_id });
       }
     } catch (e: any) {
-      setErr(e.message ?? "Failed");
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -152,10 +219,12 @@ export default function PatientPage() {
     setConsentMsg("");
     setLoading(true);
     try {
+      if (!requireAuth()) return;
       if (!profile?.public_id) throw new Error("Register yourself first (DOB) to get a Patient ID.");
 
-      // Convert datetime-local string to ISO
-      const expiresAt = expiresLocal ? new Date(expiresLocal).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString();
+      const expiresAt = expiresLocal
+        ? new Date(expiresLocal).toISOString()
+        : new Date(Date.now() + 7 * 86400000).toISOString();
 
       await api.grantConsent(profile.public_id, {
         grantee_email: doctorEmail.trim(),
@@ -163,9 +232,13 @@ export default function PatientPage() {
         expires_at: expiresAt,
       });
 
-      setConsentMsg(`✅ Consent granted to ${doctorEmail} for ${consentScope} (expires ${new Date(expiresAt).toLocaleString()})`);
+      setConsentMsg(
+        `✅ Consent granted to ${doctorEmail} for ${consentScope} (expires ${new Date(expiresAt).toLocaleString()})`
+      );
     } catch (e: any) {
-      setErr(e.message ?? "Failed");
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -176,6 +249,8 @@ export default function PatientPage() {
     setCatMsg("");
     setLoading(true);
     try {
+      if (!requireAuth()) return;
+
       const res = await api.createFromCatalog({
         scope: catScope,
         display: catItem,
@@ -183,18 +258,21 @@ export default function PatientPage() {
       });
       setCatMsg(`✅ Created ${res.fhir_resource_type}/${res.fhir_resource_id} and linked pointer.`);
     } catch (e: any) {
-      setErr(e.message ?? "Failed");
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
   }
-
 
   async function addMyPointer() {
     setErr("");
     setPtrMsg("");
     setLoading(true);
     try {
+      if (!requireAuth()) return;
+
       await api.addMyPointer({
         scope: ptrScope,
         fhir_resource_id: ptrFhirId.trim(),
@@ -203,21 +281,23 @@ export default function PatientPage() {
       setPtrMsg("✅ Pointer added. Now fetch records to see it.");
       setPtrFhirId("");
     } catch (e: any) {
-      setErr(e.message ?? "Failed");
+      const msg = e?.message ?? "Failed";
+      if (isAuthErrorMessage(msg)) handleAuthFailure(msg);
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
   }
 
-
   return (
     <AppShell
       title="My Records"
-      subtitle="Self access (18+). Register your DOB once, then browse your scoped records."
+      subtitle="Self access (18+). Log in as a patient, register your DOB once, then browse your records."
       activeNav="Records"
       onLogout={logout}
       right={
         <>
+          <span className="pill">{authed ? "Authenticated" : "Not authenticated"}</span>
           {profile?.public_id ? (
             <span className="pill">Patient: {profile.public_id}</span>
           ) : (
@@ -227,6 +307,47 @@ export default function PatientPage() {
         </>
       }
     >
+      {/* ===== NEW: Patient login card ===== */}
+      <div className="card" id="login">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Patient login</div>
+          <div className="text-xs text-slate-500">
+            You must log in as a <span className="font-mono">patient</span> before self registration or viewing records.
+          </div>
+        </div>
+
+        <div className="card-b grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_180px] gap-2 items-end">
+            <div>
+              <div className="label">Email</div>
+              <input className="input mt-2" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+
+            <div>
+              <div className="label">Password</div>
+              <input
+                className="input mt-2"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <button className="btn-primary" disabled={loading} onClick={loginPatient}>
+              {loading ? "Working..." : authed ? "Re-login" : "Login"}
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-500">
+            Tip: If you registered as guardian/doctor earlier, you still need a separate patient user to self-register.
+          </div>
+
+          {err ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>
+          ) : null}
+        </div>
+      </div>
+
       {/* Self registration */}
       <div className="card" id="patients">
         <div className="card-h">
@@ -258,6 +379,7 @@ export default function PatientPage() {
             </div>
           </div>
 
+          {/* keep error display here too (existing behavior) */}
           {err ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>
           ) : null}
@@ -324,60 +446,60 @@ export default function PatientPage() {
         <ConsentDashboard mode="patient" />
       </div>
 
-            <div className="card">
-    <div className="card-h">
-      <div className="text-sm font-semibold">Add from catalog</div>
-      <div className="text-xs text-slate-500">
-        Pick a standard item (vaccine/condition/allergy). We will create the FHIR resource automatically and link it.
+      {/* Add from catalog */}
+      <div className="card">
+        <div className="card-h">
+          <div className="text-sm font-semibold">Add from catalog</div>
+          <div className="text-xs text-slate-500">
+            Pick a standard item (vaccine/condition/allergy). We will create the FHIR resource automatically and link it.
+          </div>
+        </div>
+
+        <div className="card-b grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
+            <div>
+              <div className="label">Category</div>
+              <select
+                className="input mt-2"
+                value={catScope}
+                onChange={(e) => {
+                  const v = e.target.value as any;
+                  setCatScope(v);
+                  setCatItem((CATALOG as any)[v][0]);
+                }}
+              >
+                <option value="immunizations">immunizations</option>
+                <option value="conditions">conditions</option>
+                <option value="allergies">allergies</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="label">Pick item</div>
+              <select className="input mt-2" value={catItem} onChange={(e) => setCatItem(e.target.value)}>
+                {(CATALOG as any)[catScope].map((x: string) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="label">Issuer</div>
+              <input className="input mt-2" value={catIssuer} onChange={(e) => setCatIssuer(e.target.value)} />
+            </div>
+
+            <button className="btn-primary" disabled={loading} onClick={createAndLinkFromCatalog}>
+              {loading ? "Working..." : "Create & Link"}
+            </button>
+          </div>
+
+          {catMsg ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{catMsg}</div>
+          ) : null}
+        </div>
       </div>
-    </div>
-
-    <div className="card-b grid gap-3">
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
-        <div>
-          <div className="label">Category</div>
-          <select
-            className="input mt-2"
-            value={catScope}
-            onChange={(e) => {
-              const v = e.target.value as any;
-              setCatScope(v);
-              setCatItem((CATALOG as any)[v][0]);
-            }}
-          >
-            <option value="immunizations">immunizations</option>
-            <option value="conditions">conditions</option>
-            <option value="allergies">allergies</option>
-          </select>
-        </div>
-
-        <div>
-          <div className="label">Pick item</div>
-          <select className="input mt-2" value={catItem} onChange={(e) => setCatItem(e.target.value)}>
-            {(CATALOG as any)[catScope].map((x: string) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <div className="label">Issuer</div>
-          <input className="input mt-2" value={catIssuer} onChange={(e) => setCatIssuer(e.target.value)} />
-        </div>
-
-        <button className="btn-primary" disabled={loading} onClick={createAndLinkFromCatalog}>
-          {loading ? "Working..." : "Create & Link"}
-        </button>
-      </div>
-
-      {catMsg ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{catMsg}</div>
-      ) : null}
-    </div>
-  </div>
-
 
       {/* Add my pointer */}
       <div className="card">
@@ -432,7 +554,6 @@ export default function PatientPage() {
         </div>
       </div>
 
-
       {/* Fetch records */}
       <div className="card">
         <div className="card-h">
@@ -461,7 +582,6 @@ export default function PatientPage() {
       {/* Results */}
       {result ? (
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
-          {/* Table */}
           <div className="card overflow-hidden">
             <div className="card-h flex items-center justify-between">
               <div>
@@ -531,7 +651,6 @@ export default function PatientPage() {
             </div>
           </div>
 
-          {/* Details */}
           <div className="card overflow-hidden">
             <div className="card-h">
               <div className="text-sm font-semibold">Record details</div>
@@ -560,7 +679,6 @@ export default function PatientPage() {
         </div>
       ) : null}
 
-      {/* Audit anchor placeholder for sidebar */}
       <div id="audit" />
     </AppShell>
   );
