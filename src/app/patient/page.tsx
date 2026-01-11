@@ -599,13 +599,13 @@ export default function PatientPage() {
             </div>
 
             <div className="overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 bg-white border-b border-slate-100">
-                  <tr className="text-left text-slate-600">
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Type</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Issuer</th>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Issuer</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -621,14 +621,14 @@ export default function PatientPage() {
                         ].join(" ")}
                         onClick={() => setSelected(idx)}
                       >
-                        <td className="px-4 py-3 whitespace-nowrap">{s.date}</td>
+                        <td className="whitespace-nowrap">{s.date}</td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{s.type}</div>
                           <div className="text-xs text-slate-500">
                             {r.resource?.resourceType} / {s.id}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="whitespace-nowrap">
                           <span className="pill">{s.status}</span>
                         </td>
                         <td className="px-4 py-3">
