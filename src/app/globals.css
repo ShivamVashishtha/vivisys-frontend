@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Global base
+   ============================================================ */
+
 :root {
   color-scheme: light;
 }
@@ -15,47 +19,165 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
-/* nicer scrollbars (optional) */
+/* ============================================================
+   Scrollbars (subtle, professional)
+   ============================================================ */
+
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.2);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* small utility helpers */
+/* ============================================================
+   Component system (healthcare-grade)
+   ============================================================ */
+
 @layer utilities {
+  /* ---------- Cards ---------- */
   .card {
     @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
   }
+
   .card-h {
-    @apply px-5 py-4 border-b border-slate-100;
+    @apply px-5 py-4 border-b border-slate-100
+           flex items-center justify-between gap-3;
   }
+
   .card-b {
     @apply p-5;
   }
+
+  /* ---------- Buttons ---------- */
   .btn {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition;
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl px-4 py-2 text-sm font-medium
+           transition-colors duration-150
+           focus:outline-none focus:ring-4 focus:ring-slate-100;
   }
+
   .btn-primary {
-    @apply btn bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60;
+    @apply btn bg-slate-900 text-white
+           hover:bg-slate-800
+           disabled:opacity-60 disabled:cursor-not-allowed;
   }
+
+  .btn-secondary {
+    @apply btn bg-slate-100 text-slate-900
+           hover:bg-slate-200;
+  }
+
   .btn-ghost {
-    @apply btn border border-slate-200 bg-white hover:bg-slate-50;
+    @apply btn border border-slate-200 bg-white
+           hover:bg-slate-50;
   }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white
+           hover:bg-red-700
+           focus:ring-red-200;
+  }
+
+  /* ---------- Inputs ---------- */
   .input {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none
-           focus:ring-4 focus:ring-slate-100 focus:border-slate-300;
+    @apply w-full rounded-xl border border-slate-200 bg-white
+           px-3 py-2 text-sm
+           outline-none transition
+           focus:ring-4 focus:ring-slate-100
+           focus:border-slate-300
+           disabled:bg-slate-50 disabled:text-slate-400;
   }
+
   .label {
-    @apply text-xs font-semibold text-slate-700;
+    @apply text-xs font-semibold tracking-wide text-slate-700;
   }
+
+  /* ---------- Pills / badges ---------- */
   .pill {
-    @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700;
+    @apply inline-flex items-center gap-1
+           rounded-full border border-slate-200
+           bg-slate-50 px-2.5 py-1
+           text-xs font-medium text-slate-700;
+  }
+
+  .pill-success {
+    @apply pill bg-green-50 text-green-700 border-green-200;
+  }
+
+  .pill-warning {
+    @apply pill bg-amber-50 text-amber-700 border-amber-200;
+  }
+
+  .pill-danger {
+    @apply pill bg-red-50 text-red-700 border-red-200;
+  }
+
+  /* ---------- Tables (Consent / Records) ---------- */
+  .table {
+    @apply w-full border-collapse;
+  }
+
+  .table th {
+    @apply text-left text-xs font-semibold uppercase tracking-wide
+           text-slate-500 px-4 py-3 border-b border-slate-200;
+  }
+
+  .table td {
+    @apply px-4 py-3 text-sm border-b border-slate-100;
+  }
+
+  .table tr:hover td {
+    @apply bg-slate-50;
+  }
+
+  /* ---------- Section headers ---------- */
+  .section-title {
+    @apply text-lg font-semibold text-slate-900;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-slate-600;
+  }
+
+  /* ---------- Empty states ---------- */
+  .empty {
+    @apply rounded-xl border border-dashed border-slate-300
+           bg-slate-50 px-6 py-8 text-center
+           text-sm text-slate-600;
+  }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    @apply rounded-xl border border-slate-200
+           bg-slate-50 px-4 py-3 text-sm text-slate-700;
+  }
+
+  .callout-info {
+    @apply callout border-blue-200 bg-blue-50 text-blue-800;
+  }
+
+  .callout-success {
+    @apply callout border-green-200 bg-green-50 text-green-800;
+  }
+
+  .callout-warning {
+    @apply callout border-amber-200 bg-amber-50 text-amber-800;
+  }
+
+  /* ---------- Skeleton loaders ---------- */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-slate-200;
+  }
+
+  /* ---------- Code / JSON blocks ---------- */
+  .code {
+    @apply rounded-xl border border-slate-200 bg-slate-900
+           p-4 text-xs text-slate-100 overflow-x-auto;
   }
 }
