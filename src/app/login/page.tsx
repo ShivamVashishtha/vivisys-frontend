@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const fn = mode === "register" ? api.register : api.login;
-      const res = await fn(email, password, role);
+      const res = await api.login(email, password, role);
       setToken(res.access_token);
 
       if (role === "guardian") router.push("/guardian");
