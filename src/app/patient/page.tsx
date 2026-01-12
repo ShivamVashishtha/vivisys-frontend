@@ -195,6 +195,7 @@ export default function PatientPage() {
 
     // Selected hospital (persisted on backend)
   const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
+  const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
   
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
@@ -240,6 +241,24 @@ export default function PatientPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    // Step 1 -> Step 2 once scope is chosen
+    if (catScope && catStep < 2) setCatStep(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catScope]);
+
+  useEffect(() => {
+    // Step 2 -> Step 3 once item exists
+    if (catItem && catStep < 3) setCatStep(3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catItem]);
+
+  useEffect(() => {
+    // Step 3 -> Step 4 once issuer is valid (Hospital or Other text)
+    if (catIssuer?.trim()?.length >= 2 && catStep < 4) setCatStep(4);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catIssuer]);
+
 
   function handleAuthFailure(message?: string) {
     clearToken();
@@ -250,6 +269,12 @@ export default function PatientPage() {
     setErr(message || "Not authenticated. Please log in again.");
   }
 
+  function clampCatStep(next: number) {
+    const n = Math.max(1, Math.min(4, next));
+    setCatStep(n as 1 | 2 | 3 | 4);
+  }
+  
+  
   async function logout() {
     clearToken();
     setAuthed(false);
@@ -653,19 +678,54 @@ async function selectHospital(h: CMSHospital) {
       </div>
 
       
-      {/* Add from catalog */}
+      {/* Add from catalog (Stepper) */}
       <div className="card">
         <div className="card-h">
-          <div className="text-sm font-semibold">Add from catalog</div>
-          <div className="text-xs text-slate-500">
-            Pick a standard item (vaccine/condition/allergy). We will create the FHIR resource automatically and link it.
+          <div>
+            <div className="text-sm font-semibold">Add from catalog</div>
+            <div className="text-xs text-slate-500">
+              Pick a standard item (vaccine/condition/allergy). We will create the FHIR resource automatically and link it.
+            </div>
+          </div>
+      
+          {/* Step chips */}
+          <div className="flex flex-wrap gap-2">
+            <span className={catStep >= 1 ? "pill-success" : "pill"}>1 · Category</span>
+            <span className={catStep >= 2 ? "pill-success" : "pill"}>2 · Item</span>
+            <span className={catStep >= 3 ? "pill-success" : "pill"}>3 · Source</span>
+            <span className={catStep >= 4 ? "pill-success" : "pill"}>4 · Create</span>
           </div>
         </div>
-
-        <div className="card-b grid gap-3">
-          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
-            <div>
-              <div className="label">Category</div>
+      
+        <div className="card-b grid gap-4">
+          {/* Nav buttons */}
+          <div className="flex items-center justify-between">
+            <button
+              className="btn-secondary"
+              onClick={() => clampCatStep(catStep - 1)}
+              disabled={catStep === 1}
+            >
+              Back
+            </button>
+      
+            <div className="text-xs text-slate-500">
+              Step {catStep} of 4
+            </div>
+      
+            <button
+              className="btn-ghost"
+              onClick={() => clampCatStep(catStep + 1)}
+              disabled={catStep === 4}
+            >
+              Next
+            </button>
+          </div>
+      
+          {/* Step 1: Category */}
+          {catStep === 1 ? (
+            <div className="fade-in">
+              <div className="label">Step 1 — Choose category</div>
+      
               <select
                 className="input mt-2"
                 value={catScope}
@@ -673,27 +733,57 @@ async function selectHospital(h: CMSHospital) {
                   const v = e.target.value as any;
                   setCatScope(v);
                   setCatItem((CATALOG as any)[v][0]);
+                  clampCatStep(2);
                 }}
               >
                 <option value="immunizations">immunizations</option>
                 <option value="conditions">conditions</option>
                 <option value="allergies">allergies</option>
               </select>
+      
+              <div className="mt-4 flex justify-end">
+                <button className="btn-primary" onClick={() => clampCatStep(2)}>
+                  Continue
+                </button>
+              </div>
             </div>
-
-            <div>
-              <div className="label">Pick item</div>
-              <select className="input mt-2" value={catItem} onChange={(e) => setCatItem(e.target.value)}>
+          ) : null}
+      
+          {/* Step 2: Item */}
+          {catStep === 2 ? (
+            <div className="fade-in">
+              <div className="label">Step 2 — Pick item</div>
+      
+              <select
+                className="input mt-2"
+                value={catItem}
+                onChange={(e) => {
+                  setCatItem(e.target.value);
+                }}
+              >
                 {(CATALOG as any)[catScope].map((x: string) => (
                   <option key={x} value={x}>
                     {x}
                   </option>
                 ))}
               </select>
+      
+              <div className="mt-4 flex justify-between">
+                <button className="btn-secondary" onClick={() => clampCatStep(1)}>
+                  Back
+                </button>
+                <button className="btn-primary" onClick={() => clampCatStep(3)} disabled={!catItem}>
+                  Continue
+                </button>
+              </div>
             </div>
-            <div>
-              <div className="label">Source</div>
-            
+          ) : null}
+      
+          {/* Step 3: Source */}
+          {catStep === 3 ? (
+            <div className="fade-in">
+              <div className="label">Step 3 — Choose source</div>
+      
               <select
                 className="input mt-2"
                 value={sourceMode}
@@ -710,28 +800,82 @@ async function selectHospital(h: CMSHospital) {
                 </option>
                 <option value="other">Other / Self-reported</option>
               </select>
-            
-              {sourceMode === "other" && (
+      
+              {sourceMode === "other" ? (
                 <input
                   className="input mt-2"
                   placeholder="Enter source (e.g. Self, Clinic name)"
                   value={catIssuer}
                   onChange={(e) => setCatIssuer(e.target.value)}
                 />
+              ) : (
+                <div className="mt-2 text-xs text-slate-500">
+                  Using your selected hospital as the source.
+                </div>
               )}
+      
+              <div className="mt-4 flex justify-between">
+                <button className="btn-secondary" onClick={() => clampCatStep(2)}>
+                  Back
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() => clampCatStep(4)}
+                  disabled={sourceMode === "other" && !catIssuer.trim()}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
-
-
-            <button className="btn-primary" disabled={loading} onClick={createAndLinkFromCatalog}>
-              {loading ? "Working..." : "Create & Link"}
-            </button>
-          </div>
-
+          ) : null}
+      
+          {/* Step 4: Create */}
+          {catStep === 4 ? (
+            <div className="fade-in">
+              <div className="label">Step 4 — Review & create</div>
+      
+              <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap gap-2">
+                  <span className="pill">Category: {catScope}</span>
+                  <span className="pill">Item: {catItem}</span>
+                  <span className="pill">
+                    Source:{" "}
+                    {sourceMode === "hospital"
+                      ? hospitalSource?.name ?? "Hospital (none selected)"
+                      : catIssuer || "—"}
+                  </span>
+                </div>
+      
+                <div className="mt-2 text-xs text-slate-500">
+                  This will create a new record and link it to your profile.
+                </div>
+              </div>
+      
+              <div className="mt-4 flex justify-between">
+                <button className="btn-secondary" onClick={() => clampCatStep(3)}>
+                  Back
+                </button>
+      
+                <button
+                  className="btn-primary"
+                  disabled={loading || !catItem || (sourceMode === "other" && !catIssuer.trim())}
+                  onClick={createAndLinkFromCatalog}
+                >
+                  {loading ? "Working..." : "Create & Link"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+      
+          {/* Success message */}
           {catMsg ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{catMsg}</div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              {catMsg}
+            </div>
           ) : null}
         </div>
       </div>
+
 
       {/* Add my pointer */}
       <div className="card">
