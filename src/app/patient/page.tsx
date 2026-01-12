@@ -642,7 +642,7 @@ async function selectHospital(h: CMSHospital) {
       
         <div className="card-b">
           {hospitalSource ? (
-            <div className="flex flex-wrap items-center gap-2">
+            <div key={hospitalSource.npi} className="grid gap-2 fade-in">
               <span className="pill-success">{hospitalSource.name}</span>
               {hospitalSource.npi ? <span className="pill">NPI: {hospitalSource.npi}</span> : null}
             </div>
@@ -1019,7 +1019,7 @@ async function selectHospital(h: CMSHospital) {
         />
     
         {/* panel */}
-        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden fade-im">
           <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Find your hospital</div>
