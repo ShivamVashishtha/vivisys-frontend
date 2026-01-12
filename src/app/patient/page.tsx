@@ -211,6 +211,13 @@ export default function PatientPage() {
   const [hErr, setHErr] = useState("");
   const [hResults, setHResults] = useState<CMSHospital[]>([]);
 
+    // Provider search (doctors)
+  const [providerModalOpen, setProviderModalOpen] = useState(false);
+  const [pFirst, setPFirst] = useState("");
+  const [pLast, setPLast] = useState("");
+  const [pLoading, setPLoading] = useState(false);
+  const [pErr, setPErr] = useState("");
+  const [pResults, setPResults] = useState<any[]>([]);
 
   const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
   const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
@@ -372,6 +379,45 @@ async function selectHospital(h: CMSHospital) {
   }
 }
 
+async function searchProviders() {
+  setPErr("");
+  setPResults([]);
+
+  if (!pLast.trim() || pLast.trim().length < 2) {
+    setPErr("Enter at least 2 characters of last name.");
+    return;
+  }
+
+  setPLoading(true);
+  try {
+    // Bias provider search using the hospital modal filters (hCity/hState/hPostal)
+    // (If you want, you can also bias by saved hospital selection fields later.)
+    const biasCity = hCity.trim() || undefined;
+    const biasState = hState.trim() ? hState.trim().toUpperCase() : undefined;
+    const biasPostal = hPostal.trim() || undefined;
+
+    const res = await api.searchProvidersCMS({
+      first_name: pFirst.trim() || undefined,
+      last_name: pLast.trim(),
+      city: biasCity,
+      state: biasState,
+      postal_code: biasPostal,
+      limit: 25,
+      skip: 0,
+    });
+
+    setPResults(res.results || []);
+    if (!(res.results || []).length) {
+      setPErr("No providers found. Try removing city/ZIP or broaden last name.");
+    }
+  } catch (e: any) {
+    setPErr(e?.message ?? "Provider search failed");
+  } finally {
+    setPLoading(false);
+  }
+}
+
+  
   // ===== NEW: Patient login =====
   async function loginPatient() {
     setErr("");
@@ -685,16 +731,28 @@ async function selectHospital(h: CMSHospital) {
             </div>
           </div>
       
-          <button
-            className="btn-ghost"
-            onClick={() => {
-              setHErr("");
-              setHResults([]);
-              setHospitalModalOpen(true);
-            }}
-          >
-            {hospitalSource ? "Change" : "Select"}
-          </button>
+          {/* Right-side actions */}
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-ghost"
+              onClick={() => setProviderModalOpen(true)}
+              disabled={!hospitalSource}
+              title={hospitalSource ? "Find doctors near your selected hospital" : "Select a hospital first"}
+            >
+              Find doctors
+            </button>
+      
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setHErr("");
+                setHResults([]);
+                setHospitalModalOpen(true);
+              }}
+            >
+              {hospitalSource ? "Change" : "Select"}
+            </button>
+          </div>
         </div>
       
         <div className="card-b">
@@ -708,6 +766,7 @@ async function selectHospital(h: CMSHospital) {
           )}
         </div>
       </div>
+
 
       
       {/* Add from catalog (Stepper) */}
@@ -1227,7 +1286,7 @@ async function selectHospital(h: CMSHospital) {
         />
     
         {/* panel */}
-        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden fade-im">
+        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden fade-in">
           <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Find your hospital</div>
@@ -1352,6 +1411,132 @@ async function selectHospital(h: CMSHospital) {
         </div>
       </div>
     ) : null}
+    {providerModalOpen ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-black/30"
+        onClick={() => setProviderModalOpen(false)}
+      />
+  
+      {/* panel */}
+      <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden fade-in">
+        <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">Find doctors (CMS NPI Registry)</div>
+            <div className="text-xs text-slate-500">
+              Search individual providers (NPI-1). Results are biased using the city/state/ZIP you entered above.
+            </div>
+  
+            {(hCity || hState || hPostal) ? (
+              <div className="mt-1 text-xs text-slate-500">
+                Location bias: {[hCity, hState, hPostal].filter(Boolean).join(", ")}
+              </div>
+            ) : null}
+          </div>
+  
+          <button className="btn-ghost" onClick={() => setProviderModalOpen(false)}>
+            Close
+          </button>
+        </div>
+  
+        <div className="p-4 grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_160px] gap-2 items-end">
+            <div>
+              <div className="label">First name (optional)</div>
+              <input
+                className="input mt-2"
+                value={pFirst}
+                onChange={(e) => setPFirst(e.target.value)}
+                placeholder="Jane"
+              />
+            </div>
+  
+            <div>
+              <div className="label">Last name (required)</div>
+              <input
+                className="input mt-2"
+                value={pLast}
+                onChange={(e) => setPLast(e.target.value)}
+                placeholder="Doe"
+              />
+              <div className="text-xs text-slate-500 mt-1">
+                Tip: Use last name + city/state for best results.
+              </div>
+            </div>
+  
+            <button
+              className="btn-primary w-full"
+              onClick={searchProviders}
+              disabled={pLoading}
+            >
+              {pLoading ? "Searching..." : "Search"}
+            </button>
+          </div>
+  
+          {pErr ? <div className="callout-warning">{pErr}</div> : null}
+  
+          <div className="rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="max-h-[420px] overflow-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Address</th>
+                    <th>Taxonomy</th>
+                    <th>NPI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pResults.length ? (
+                    pResults.map((p: any) => (
+                      <tr key={p.npi}>
+                        <td>
+                          <div className="font-medium text-slate-900">{p.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {p.address?.telephone_number ? `☎ ${p.address.telephone_number}` : " "}
+                          </div>
+                        </td>
+  
+                        <td className="text-slate-700">
+                          {[
+                            p.address?.line1,
+                            [p.address?.city, p.address?.state, p.address?.postal_code]
+                              .filter(Boolean)
+                              .join(", "),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </td>
+  
+                        <td>
+                          <span className="pill">
+                            {p.taxonomy?.desc || p.taxonomy?.code || "—"}
+                          </span>
+                        </td>
+  
+                        <td className="font-mono text-xs">{p.npi}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="text-slate-500">
+                        Enter a last name and search to see results.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+  
+            <div className="p-3 text-xs text-slate-500 border-t border-slate-100">
+              Note: CMS doesn’t provide a perfect “doctor belongs to hospital” link. We approximate using location.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null}
 
     </AppShell>
   );
