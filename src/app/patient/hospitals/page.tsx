@@ -256,6 +256,7 @@ export default function PatientHospitalsPage() {
   }
 
   return (
+    <>
     <AppShell
       title="Hospitals"
       subtitle="Search hospitals from the CMS NPI Registry and select the one that matches your records."
@@ -456,6 +457,7 @@ export default function PatientHospitalsPage() {
         </div>
       </div>
     </AppShell>
+      
     {providerModalOpen ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* backdrop */}
