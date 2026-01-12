@@ -277,3 +277,29 @@ body {
     transform: none;
   }
 }
+
+/* ============================================================
+   Page transitions (global)
+   ============================================================ */
+
+.page-transition {
+  animation: pageFadeIn 220ms ease-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
