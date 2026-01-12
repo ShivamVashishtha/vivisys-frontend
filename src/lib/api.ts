@@ -370,4 +370,31 @@ export const api = {
     true
   ),
 
+  // ======================
+  // Provider selection (Patient)
+  // ======================
+  getMyProviderSelection: () =>
+    request<{ selected: any | null }>(`/providers/me`, {}, true),
+
+  setMyProviderSelection: (payload: {
+    npi: string;
+    name: string;
+    taxonomy_desc?: string | null;
+    telephone_number?: string | null;
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+  }) =>
+    request<{ status: string; selected?: { npi: string; name: string } }>(
+      `/providers/me/select`,
+      { method: "POST", body: JSON.stringify(payload) },
+      true
+    ),
+
+  clearMyProviderSelection: () =>
+    request<{ status: string; cleared: boolean }>(`/providers/me/clear`, { method: "POST" }, true),
+
+  
 };
