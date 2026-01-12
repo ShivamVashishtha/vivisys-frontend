@@ -350,4 +350,24 @@ export const api = {
       taxonomy_desc?: string | null;
     }>(`/patients/me/hospital`, { method: "POST", body: JSON.stringify(payload) }, true),
 
+  getMyProviderSelection: () =>
+    request<{
+      npi: string | null;
+      name: string | null;
+      taxonomy_desc: string | null;
+      telephone_number: string | null;
+  }>(`/providers/me`, {}, true),
+
+  setMyProviderSelection: (payload: {
+    npi: string | null;
+    name: string;
+    taxonomy_desc?: string | null;
+    telephone_number?: string | null;
+}) =>
+  request<{ status: string }>(
+    `/providers/me`,
+    { method: "POST", body: JSON.stringify(payload) },
+    true
+  ),
+
 };
