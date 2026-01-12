@@ -197,7 +197,7 @@ export default function PatientPage() {
   const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
   const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
   const [showRawJson, setShowRawJson] = useState(false);
-
+  const [showAdvanced, setShowAdvanced] = useState(false);
   
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
