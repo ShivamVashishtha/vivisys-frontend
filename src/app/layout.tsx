@@ -9,18 +9,6 @@ export const metadata: Metadata = {
   description: "Health Records Portal (Demo)",
 };
 
-// layout.tsx
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <div className="fade-in">
-          {children}
-        </div>
-      </body>
-    </html>
-  );
-}
 
 
 export default function RootLayout({
@@ -28,7 +16,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} min-h-screen`}>{children}</body>
+      <body>
+        <div className="page-transition">
+          {children}
+        </div>
+      </body>
+
     </html>
   );
 }
