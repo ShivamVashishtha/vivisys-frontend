@@ -196,9 +196,7 @@ export default function PatientPage() {
     // Selected hospital (persisted on backend)
   const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
   const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
-
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
+  
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
   const [hName, setHName] = useState("");
@@ -879,7 +877,7 @@ async function selectHospital(h: CMSHospital) {
       </div>
 
 
-      {/* Advanced (Add pointer) */}
+      {/* Advanced (Add my pointer) */}
       <div className="card">
         <div className="card-h">
           <div>
@@ -896,13 +894,11 @@ async function selectHospital(h: CMSHospital) {
       
         {showAdvanced ? (
           <div className="card-b fade-in grid gap-3">
-            {/* ✅ Paste your existing Add Pointer UI here exactly as-is */}
-            {/* Example structure (keep your exact existing fields/handlers): */}
-      
+            {/* Add my pointer */}
             <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
               <div>
                 <div className="label">Scope</div>
-                <select className="input mt-2" value={ptrScope} onChange={(e) => setPtrScope(e.target.value as any)}>
+                <select className="input mt-2" value={ptrScope} onChange={(e) => setPtrScope(e.target.value as Scope)}>
                   <option value="immunizations">immunizations</option>
                   <option value="allergies">allergies</option>
                   <option value="conditions">conditions</option>
@@ -913,24 +909,27 @@ async function selectHospital(h: CMSHospital) {
                 <div className="label">FHIR Resource ID</div>
                 <input
                   className="input mt-2"
-                  value={ptrFHIRId}
-                  onChange={(e) => setPtrFHIRId(e.target.value)}
-                  placeholder="e.g. 12345"
+                  value={ptrFhirId}
+                  onChange={(e) => setPtrFhirId(e.target.value)}
+                  placeholder='e.g. "1001"'
                 />
                 <div className="mt-1 text-xs text-slate-500">
-                  Paste the FHIR resource id (from your provider system).
+                  Paste the FHIR resource id from your provider system.
                 </div>
               </div>
       
               <div>
                 <div className="label">Source</div>
+      
                 <select
                   className="input mt-2"
-                  value={ptrSourceMode}
+                  value={sourceMode}
                   onChange={(e) => {
                     const v = e.target.value as "hospital" | "other";
-                    setPtrSourceMode(v);
-                    if (v === "hospital" && hospitalSource) setPtrIssuer(hospitalSource.name);
+                    setSourceMode(v);
+                    if (v === "hospital" && hospitalSource) {
+                      setPtrIssuer(hospitalSource.name);
+                    }
                   }}
                 >
                   <option value="hospital" disabled={!hospitalSource}>
@@ -939,18 +938,22 @@ async function selectHospital(h: CMSHospital) {
                   <option value="other">Other / Self-reported</option>
                 </select>
       
-                {ptrSourceMode === "other" ? (
+                {sourceMode === "other" ? (
                   <input
                     className="input mt-2"
                     placeholder="Enter source (e.g. Self, Clinic name)"
                     value={ptrIssuer}
                     onChange={(e) => setPtrIssuer(e.target.value)}
                   />
-                ) : null}
+                ) : (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Using your selected hospital as the source.
+                  </div>
+                )}
               </div>
       
-              <button className="btn-primary" disabled={loading} onClick={addPointerForMe}>
-                {loading ? "Working..." : "Add pointer"}
+              <button className="btn-primary" disabled={loading} onClick={addMyPointer}>
+                {loading ? "Working..." : "Add"}
               </button>
             </div>
       
