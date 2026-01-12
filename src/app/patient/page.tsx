@@ -210,9 +210,6 @@ export default function PatientPage() {
   const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
   const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
   const [catIssuer, setCatIssuer] = useState("Self (Patient)");
-  name: string;
-  npi?: string;
-} | null>(null);
 
   const [sourceMode, setSourceMode] = useState<"hospital" | "other">("hospital");
 
