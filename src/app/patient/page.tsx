@@ -210,7 +210,6 @@ export default function PatientPage() {
   const [catScope, setCatScope] = useState<"immunizations" | "conditions" | "allergies">("immunizations");
   const [catItem, setCatItem] = useState<string>(CATALOG.immunizations[0]);
   const [catIssuer, setCatIssuer] = useState("Self (Patient)");
-  const [hospitalSource, setHospitalSource] = useState<{
   name: string;
   npi?: string;
 } | null>(null);
@@ -243,23 +242,6 @@ export default function PatientPage() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-  (async () => {
-    try {
-      const saved = await api.getMyHospitalSelection();
-      if (saved) {
-        setHospitalSource({
-          name: saved.hospital_name,
-          npi: saved.hospital_npi,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  })();
-}, []);
-
 
 
   function handleAuthFailure(message?: string) {
@@ -578,42 +560,6 @@ async function selectHospital(h: CMSHospital) {
         </div>
       </div>
 
-      {/* Selected hospital */}
-      <div className="card">
-        <div className="card-h">
-          <div>
-            <div className="text-sm font-semibold">Record source (Hospital)</div>
-            <div className="text-xs text-slate-500">
-              This hospital will be used as the source for new records unless you choose “Other”.
-            </div>
-          </div>
-      
-          <a href="/patient/hospitals" className="btn-ghost">
-            {hospitalSource ? "Change" : "Select"}
-          </a>
-        </div>
-      
-        <div className="card-b">
-          {hospitalSource ? (
-            <div className="grid gap-2">
-              <div className="font-medium text-slate-900">
-                {hospitalSource.name}
-              </div>
-              {hospitalSource.npi ? (
-                <div className="text-xs text-slate-600">
-                  NPI: <span className="font-mono">{hospitalSource.npi}</span>
-                </div>
-              ) : null}
-              <span className="pill-success w-fit">Default source</span>
-            </div>
-          ) : (
-            <div className="empty">
-              No hospital selected yet. Select one to mark records as hospital-verified.
-            </div>
-          )}
-        </div>
-      </div>
-
       
       {/* Grant consent (Patient -> Doctor) */}
       <div className="card">
@@ -844,7 +790,7 @@ async function selectHospital(h: CMSHospital) {
                 <input
                   className="input mt-2"
                   placeholder="Enter source (e.g. Self, Clinic name)"
-                  value={catIssuer}
+                  value={ptrIssuer}
                   onChange={(e) => setPtrIssuer(e.target.value)}
                 />
               )}
