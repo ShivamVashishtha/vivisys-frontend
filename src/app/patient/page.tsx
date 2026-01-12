@@ -286,6 +286,16 @@ export default function PatientPage() {
   }, []);
 
   useEffect(() => {
+  (async () => {
+    try {
+      const res = await api.getMyProviderSelection();
+      if (res?.selected) setProviderSource(res.selected);
+    } catch {}
+  })();
+}, []);
+
+
+  useEffect(() => {
     // Step 1 -> Step 2 once scope is chosen
     if (catScope && catStep < 2) setCatStep(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,6 +398,42 @@ async function selectHospital(h: CMSHospital) {
   }
 }
 
+async function selectProvider(p: any) {
+  const picked = {
+    npi: String(p.npi),
+    name: String(p.name || ""),
+    taxonomy: p.taxonomy?.desc || p.taxonomy?.code || "",
+    phone: p.address?.telephone_number || "",
+  };
+
+  // update UI state
+  setProviderSource(picked);
+
+  // local fallback
+  try {
+    localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
+  } catch {}
+
+  // persist to backend (DB)
+  try {
+    await api.setMyProviderSelection({
+      npi: picked.npi,
+      name: picked.name,
+      taxonomy_desc: picked.taxonomy || null,
+      telephone_number: picked.phone || null,
+      line1: p.address?.line1 ?? null,
+      line2: null,
+      city: p.address?.city ?? null,
+      state: p.address?.state ?? null,
+      postal_code: p.address?.postal_code ?? null,
+    });
+  } catch (e: any) {
+    // if save fails, keep UI selection but show error somewhere you already use (pErr or err)
+    setPErr?.(e?.message ?? "Could not save doctor selection"); // if you have setPErr
+  }
+}
+
+  
 async function searchProviders() {
   setPErr("");
   setPResults([]);
@@ -828,12 +874,19 @@ function selectProvider(p: any) {
         
                 <button
                   className="btn-ghost w-fit"
-                  onClick={() => {
-                    setProviderSource(null);
-                    try {
-                      localStorage.removeItem(PROVIDER_KEY);
-                    } catch {}
-                  }}
+                  onClick={async () => {
+                  setProviderSource(null);
+                
+                  try {
+                    localStorage.removeItem(PROVIDER_KEY);
+                  } catch {}
+                
+                  try {
+                    await api.clearMyProviderSelection();
+                  } catch {
+                    // optional: show an error if you want
+                  }
+                }}
                 >
                   Clear doctor selection
                 </button>
@@ -1593,7 +1646,14 @@ function selectProvider(p: any) {
                           </td>
                 
                           <td className="font-mono text-xs">{p.npi}</td>
-                
+                          <td className="text-right">
+                            <button
+                              className={providerSource?.npi === p.npi ? "btn-secondary" : "btn-primary"}
+                              onClick={() => selectProvider(p)}
+                            >
+                              {providerSource?.npi === p.npi ? "Selected" : "Select"}
+                            </button>
+                          </td>
                           {/* ✅ Select action */}
                           <td className="text-right">
                             <button
