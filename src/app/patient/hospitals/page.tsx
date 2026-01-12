@@ -190,9 +190,22 @@ export default function PatientHospitalsPage() {
     setPLoading(true);
     try {
       // auto-bias to the selected hospital’s location if available
-      const city = hCity.trim() || undefined;
-      const state = hState.trim() ? hState.trim().toUpperCase() : undefined;
-      const postal_code = hPostal.trim() || undefined;
+      // Auto-bias provider search using hospital selection first,
+      // otherwise fallback to whatever the user typed in the hospital search filters.
+      const city =
+        selected?.address?.city?.trim() ||
+        city.trim() ||
+        undefined;
+      
+      const state =
+        selected?.address?.state?.trim()?.toUpperCase() ||
+        (stateUS.trim() ? stateUS.trim().toUpperCase() : undefined);
+      
+      const postal_code =
+        selected?.address?.postal_code?.trim() ||
+        postal.trim() ||
+        undefined;
+
 
       const res = await api.searchProvidersCMS({
         first_name: pFirst.trim() || undefined,
