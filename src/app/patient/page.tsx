@@ -177,6 +177,8 @@ export default function PatientPage() {
   const [scope, setScope] = useState<Scope>("immunizations");
   const [result, setResult] = useState<any>(null);
   const [selected, setSelected] = useState<number>(0);
+  const [recordQuery, setRecordQuery] = useState("");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   // Global error / loading
   const [err, setErr] = useState<string>("");
@@ -219,9 +221,33 @@ export default function PatientPage() {
   const [catMsg, setCatMsg] = useState("");
 
   const [detailMsg, setDetailMsg] = useState<string>("");
+  const recordsRaw: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
+  
+  const recordsFiltered: RecordItem[] = useMemo(() => {
+    const q = recordQuery.trim().toLowerCase();
+    return recordsRaw.filter((r) => {
+      const s = resourceSummary(r.resource);
+      const issuer = String(r.issuer || "").toLowerCase();
+      const type = String(s.type || "").toLowerCase();
+      const rt = String(r.resource?.resourceType || "").toLowerCase();
+  
+      const matchesQ =
+        !q || issuer.includes(q) || type.includes(q) || rt.includes(q) || String(s.id || "").toLowerCase().includes(q);
+  
+      // “verified” heuristic: anything not self reported
+      const isVerified = !issuer.includes("self");
+  
+      const matchesVerified = !verifiedOnly || isVerified;
+      return matchesQ && matchesVerified;
+    });
+  }, [recordsRaw, recordQuery, verifiedOnly]);
+  
+  const selectedRecord = recordsFiltered[selected];
 
-  const records: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
-  const selectedRecord = records[selected];
+
+  useEffect(() => {
+    setSelected(0);
+  }, [recordQuery, verifiedOnly, scope]);
 
   useEffect(() => {
     setAuthed(!!getToken());
@@ -1009,18 +1035,22 @@ async function selectHospital(h: CMSHospital) {
       {result ? (
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
           <div className="card overflow-hidden">
-            <div className="card-h flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold">Records</div>
-                <div className="text-xs text-slate-500">
-                  {result.patient_public_id ? (
-                    <>
-                      patient: <span className="font-mono">{result.patient_public_id}</span> ·{" "}
-                    </>
-                  ) : null}
-                  {result.count} record(s)
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <input
+                className="input h-9 w-48 md:w-64"
+                placeholder="Search type, issuer, ID..."
+                value={recordQuery}
+                onChange={(e) => setRecordQuery(e.target.value)}
+              />
+              <label className="pill cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={verifiedOnly}
+                  onChange={(e) => setVerifiedOnly(e.target.checked)}
+                />
+                Verified only
+              </label>
               <span className="pill">{result.scope}</span>
             </div>
 
@@ -1035,7 +1065,7 @@ async function selectHospital(h: CMSHospital) {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((r, idx) => {
+                  {recordsFiltered.map((r, idx) => {
                     const s = resourceSummary(r.resource);
                     const active = idx === selected;
                     return (
@@ -1065,7 +1095,7 @@ async function selectHospital(h: CMSHospital) {
                     );
                   })}
 
-                  {records.length === 0 ? (
+                  {recordsFiltered.length === 0 ? (
                     <tr>
                       <td className="px-4 py-10 text-slate-500" colSpan={4}>
                         No records returned.
@@ -1078,7 +1108,7 @@ async function selectHospital(h: CMSHospital) {
           </div>
 
           <div className="card overflow-hidden">
-            <div className="card-h">
+           <div className="card-h sticky top-0 z-10 bg-white">
               <div>
                 <div className="text-sm font-semibold">Record details</div>
                 <div className="text-xs text-slate-500">
@@ -1103,7 +1133,7 @@ async function selectHospital(h: CMSHospital) {
               ) : null}
             </div>
           
-            <div className="p-4">
+           <div className="p-4 max-h-[720px] overflow-auto">
               {selectedRecord ? (
                 <>
                   {(() => {
