@@ -64,25 +64,6 @@ function selectProvider(p: any) {
     phone: p.address?.telephone_number ?? null,
   };
 
-  setProviderSource(picked);
-
-  // local fallback
-  try {
-    localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
-  } catch {}
-
-  // optional backend persist (if you add api method)
-  // If not implemented yet, this will just no-op silently.
-  api
-    .setMyProviderSelection?.({
-      npi: picked.npi ?? null,
-      name: picked.name,
-      taxonomy_desc: picked.taxonomy ?? null,
-      telephone_number: picked.phone ?? null,
-    })
-    .catch(() => {});
-}
-
 
 function formatDate(s?: string) {
   if (!s) return "—";
@@ -454,6 +435,7 @@ async function searchProviders() {
   }
 }
 
+
   
   // ===== NEW: Patient login =====
   async function loginPatient() {
@@ -555,6 +537,22 @@ async function searchProviders() {
     }
   }
 
+
+  function selectProvider(p: any) {
+    const picked = {
+      name: p.name,
+      npi: p.npi,
+      taxonomy: p.taxonomy?.desc || p.taxonomy?.code || undefined,
+      phone: p.address?.telephone_number ?? null,
+    };
+
+    setProviderSource(picked);
+
+    try {
+      localStorage.setItem("vivisys_selected_provider", JSON.stringify(picked));
+    } catch {}
+  }
+  
   async function createAndLinkFromCatalog() {
     setErr("");
     setCatMsg("");
@@ -577,6 +575,7 @@ async function searchProviders() {
     }
   }
 
+  
   async function addMyPointer() {
     setErr("");
     setPtrMsg("");
