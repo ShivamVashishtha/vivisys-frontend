@@ -189,33 +189,34 @@ export default function PatientHospitalsPage() {
 
     setPLoading(true);
     try {
-      // auto-bias to the selected hospital’s location if available
       // Auto-bias provider search using hospital selection first,
       // otherwise fallback to whatever the user typed in the hospital search filters.
-      const city =
+      const cityFilter =
         selected?.address?.city?.trim() ||
         city.trim() ||
         undefined;
       
-      const state =
-        selected?.address?.state?.trim()?.toUpperCase() ||
+      const stateFilter =
+        (selected?.address?.state?.trim()
+          ? selected.address.state.trim().toUpperCase()
+          : undefined) ||
         (stateUS.trim() ? stateUS.trim().toUpperCase() : undefined);
       
-      const postal_code =
+      const postalFilter =
         selected?.address?.postal_code?.trim() ||
         postal.trim() ||
         undefined;
 
-
       const res = await api.searchProvidersCMS({
         first_name: pFirst.trim() || undefined,
         last_name: pLast.trim(),
-        city,
-        state,
-        postal_code,
+        city: cityFilter,
+        state: stateFilter,
+        postal_code: postalFilter,
         limit: 25,
         skip: 0,
       });
+
 
       setPResults(res.results || []);
       if (!(res.results || []).length) setPErr("No providers found. Try removing city/ZIP or broaden last name.");
@@ -325,6 +326,14 @@ export default function PatientHospitalsPage() {
 
       {/* Search */}
       <div className="card">
+      <div className="card-h">
+        <div>
+          <div className="text-sm font-semibold">Find a hospital</div>
+          <div className="text-xs text-slate-500">
+            Enter a hospital name (e.g. “Unity Hospital”). If unsure, add city/state to narrow results.
+          </div>
+        </div>
+    
         <div className="flex items-center gap-2">
           <button
             className="btn-ghost"
@@ -334,7 +343,7 @@ export default function PatientHospitalsPage() {
           >
             Find doctors
           </button>
-        
+    
           <button
             className="btn-ghost"
             onClick={() => runSearch(false)}
@@ -343,9 +352,10 @@ export default function PatientHospitalsPage() {
             {loading ? "Searching..." : "Search"}
           </button>
         </div>
+      </div>
+    
+      <div className="card-b">
 
-
-        <div className="card-b grid gap-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <div className="label">Hospital name (required)</div>
