@@ -456,129 +456,133 @@ export default function PatientHospitalsPage() {
         </div>
       </div>
     </AppShell>
+    </AppShell>
     {providerModalOpen ? (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    {/* backdrop */}
-    <div
-      className="absolute inset-0 bg-black/30"
-      onClick={() => setProviderModalOpen(false)}
-    />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* backdrop */}
+        <div
+          className="absolute inset-0 bg-black/30"
+          onClick={() => setProviderModalOpen(false)}
+        />
 
-    <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-      <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold">Find doctors (CMS NPI Registry)</div>
-          <div className="text-xs text-slate-500">
-            Search individual providers (NPI-1). We bias results using your selected hospital’s location.
-          </div>
+        <div className="relative w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Find doctors (CMS NPI Registry)</div>
+              <div className="text-xs text-slate-500">
+                Search individual providers (NPI-1). We bias results using your selected hospital’s location.
+              </div>
 
-          {selected?.address ? (
-            <div className="mt-1 text-xs text-slate-500">
-              Location bias: {selected.address.city}, {selected.address.state}{" "}
-              {selected.address.postal_code}
+              {selected?.address ? (
+                <div className="mt-1 text-xs text-slate-500">
+                  Location bias: {selected.address.city}, {selected.address.state}{" "}
+                  {selected.address.postal_code}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
 
-        <button className="btn-ghost" onClick={() => setProviderModalOpen(false)}>
-          Close
-        </button>
-      </div>
-
-      <div className="p-4 grid gap-3">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_160px] gap-2 items-end">
-          <div>
-            <div className="label">First name (optional)</div>
-            <input
-              className="input mt-2"
-              value={pFirst}
-              onChange={(e) => setPFirst(e.target.value)}
-              placeholder="Jane"
-            />
+            <button className="btn-ghost" onClick={() => setProviderModalOpen(false)}>
+              Close
+            </button>
           </div>
 
-          <div>
-            <div className="label">Last name (required)</div>
-            <input
-              className="input mt-2"
-              value={pLast}
-              onChange={(e) => setPLast(e.target.value)}
-              placeholder="Doe"
-            />
-            <div className="text-xs text-slate-500 mt-1">
-              Tip: Use last name + city/state for best results.
+          <div className="p-4 grid gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_160px] gap-2 items-end">
+              <div>
+                <div className="label">First name (optional)</div>
+                <input
+                  className="input mt-2"
+                  value={pFirst}
+                  onChange={(e) => setPFirst(e.target.value)}
+                  placeholder="Jane"
+                />
+              </div>
+
+              <div>
+                <div className="label">Last name (required)</div>
+                <input
+                  className="input mt-2"
+                  value={pLast}
+                  onChange={(e) => setPLast(e.target.value)}
+                  placeholder="Doe"
+                />
+                <div className="text-xs text-slate-500 mt-1">
+                  Tip: Use last name + city/state for best results.
+                </div>
+              </div>
+
+              <button
+                className="btn-primary w-full"
+                onClick={searchProviders}
+                disabled={pLoading}
+              >
+                {pLoading ? "Searching..." : "Search"}
+              </button>
             </div>
-          </div>
 
-          <button
-            className="btn-primary w-full"
-            onClick={searchProviders}
-            disabled={pLoading}
-          >
-            {pLoading ? "Searching..." : "Search"}
-          </button>
-        </div>
+            {pErr ? <div className="callout-warning">{pErr}</div> : null}
 
-        {pErr ? <div className="callout-warning">{pErr}</div> : null}
-
-        <div className="rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="max-h-[420px] overflow-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Provider</th>
-                  <th>Address</th>
-                  <th>Taxonomy</th>
-                  <th>NPI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pResults.length ? (
-                  pResults.map((p: any) => (
-                    <tr key={p.npi}>
-                      <td>
-                        <div className="font-medium text-slate-900">{p.name}</div>
-                        <div className="text-xs text-slate-500">
-                          {p.address?.telephone_number ? `☎ ${p.address.telephone_number}` : " "}
-                        </div>
-                      </td>
-
-                      <td className="text-slate-700">
-                        {[p.address?.line1, [p.address?.city, p.address?.state, p.address?.postal_code]
-                          .filter(Boolean)
-                          .join(", ")]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </td>
-
-                      <td>
-                        <span className="pill">
-                          {p.taxonomy?.desc || p.taxonomy?.code || "—"}
-                        </span>
-                      </td>
-
-                      <td className="font-mono text-xs">{p.npi}</td>
+            <div className="rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="max-h-[420px] overflow-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Provider</th>
+                      <th>Address</th>
+                      <th>Taxonomy</th>
+                      <th>NPI</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="text-slate-500">
-                      Enter a last name and search to see results.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {pResults.length ? (
+                      pResults.map((prov: any) => (
+                        <tr key={prov.npi}>
+                          <td>
+                            <div className="font-medium text-slate-900">{prov.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {prov.address?.telephone_number ? `☎ ${prov.address.telephone_number}` : " "}
+                            </div>
+                          </td>
+
+                          <td className="text-slate-700">
+                            {[
+                              prov.address?.line1,
+                              [prov.address?.city, prov.address?.state, prov.address?.postal_code]
+                                .filter(Boolean)
+                                .join(", "),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </td>
+
+                          <td>
+                            <span className="pill">
+                              {prov.taxonomy?.desc || prov.taxonomy?.code || "—"}
+                            </span>
+                          </td>
+
+                          <td className="font-mono text-xs">{prov.npi}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-slate-500">
+                          Enter a last name and search to see results.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-500">
+              Note: CMS doesn’t provide a perfect “doctor belongs to hospital” link. We approximate using location.
+            </div>
           </div>
         </div>
-
-        <div className="text-xs text-slate-500">
-          Note: CMS doesn’t provide a perfect “doctor belongs to hospital” link. We approximate using location.
-        </div>
       </div>
-    </div>
-  </div>
-) : null}
-
-  );
+    ) : null}
+  </>
+);
 }
