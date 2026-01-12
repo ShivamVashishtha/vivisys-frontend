@@ -681,13 +681,9 @@ async function selectHospital(h: CMSHospital) {
               </select>
             </div>
 
-            <div key={catScope} className="fade-in">
+            <div>
               <div className="label">Pick item</div>
-              <select
-                className="input mt-2"
-                value={catItem}
-                onChange={(e) => setCatItem(e.target.value)}
-              >
+              <select className="input mt-2" value={catItem} onChange={(e) => setCatItem(e.target.value)}>
                 {(CATALOG as any)[catScope].map((x: string) => (
                   <option key={x} value={x}>
                     {x}
@@ -695,7 +691,6 @@ async function selectHospital(h: CMSHospital) {
                 ))}
               </select>
             </div>
-
             <div>
               <div className="label">Source</div>
             
