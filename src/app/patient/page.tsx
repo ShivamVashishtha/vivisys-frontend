@@ -196,6 +196,8 @@ export default function PatientPage() {
     // Selected hospital (persisted on backend)
   const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
   const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
+  const [showRawJson, setShowRawJson] = useState(false);
+
   
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
@@ -259,6 +261,10 @@ export default function PatientPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catIssuer]);
 
+
+  useEffect(() => {
+    setShowRawJson(false);
+  }, [selected]);
 
   function handleAuthFailure(message?: string) {
     clearToken();
@@ -1073,105 +1079,110 @@ async function selectHospital(h: CMSHospital) {
 
           <div className="card overflow-hidden">
             <div className="card-h">
-              <div className="text-sm font-semibold">Record details</div>
-              <div className="text-xs text-slate-500">
-                {selectedRecord ? (
-                  <>
-                    issuer: <span className="font-medium">{selectedRecord.issuer}</span> · pointer:{" "}
-                    <span className="font-mono">{selectedRecord.pointer_id}</span>
-                  </>
-                ) : (
-                  "Select a record to view details."
-                )}
+              <div>
+                <div className="text-sm font-semibold">Record details</div>
+                <div className="text-xs text-slate-500">
+                  {selectedRecord ? (
+                    <>
+                      issuer: <span className="font-medium">{selectedRecord.issuer}</span> · pointer:{" "}
+                      <span className="font-mono">{selectedRecord.pointer_id}</span>
+                    </>
+                  ) : (
+                    "Select a record to view details."
+                  )}
+                </div>
               </div>
+          
+              {/* Right side actions */}
+              {selectedRecord ? (
+                <div className="flex items-center gap-2">
+                  <button className="btn-ghost" onClick={() => setShowRawJson((v) => !v)}>
+                    {showRawJson ? "Hide JSON" : "View JSON"}
+                  </button>
+                </div>
+              ) : null}
             </div>
-
-          <div className="p-4">
-            {selectedRecord ? (
-              <>
-                {(() => {
-                  const h = summarizeForHeader(selectedRecord.resource);
-                  return (
-                    <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-900 truncate">
-                            {h.title}
+          
+            <div className="p-4">
+              {selectedRecord ? (
+                <>
+                  {(() => {
+                    const h = summarizeForHeader(selectedRecord.resource);
+                    return (
+                      <div key={selectedRecord.pointer_id} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 fade-in">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 truncate">
+                              {h.title}
+                            </div>
+          
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-600">
+                              <span className="pill">{h.resourceType}</span>
+                              <span className="pill">Status: {h.status}</span>
+                              <span className="pill">Date: {h.dateLabel}</span>
+                            </div>
+          
+                            <div className="mt-2 text-xs text-slate-600">
+                              <span className="font-semibold">Issuer:</span>{" "}
+                              <span className="text-slate-800">{selectedRecord.issuer}</span>
+                            </div>
+          
+                            <div className="mt-1 text-xs text-slate-600">
+                              <span className="font-semibold">FHIR ID:</span>{" "}
+                              <span className="font-mono text-slate-800">{h.id}</span>
+                            </div>
+          
+                            <div className="mt-1 text-xs text-slate-600">
+                              <span className="font-semibold">Pointer:</span>{" "}
+                              <span className="font-mono text-slate-800">{selectedRecord.pointer_id}</span>
+                            </div>
                           </div>
           
-                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-600">
-                            <span className="pill">{h.resourceType}</span>
-                            <span className="pill">Status: {h.status}</span>
-                            <span className="pill">Date: {h.dateLabel}</span>
-                          </div>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <button
+                              className="btn-ghost"
+                              onClick={() => copyText("FHIR ID", String(h.id), setDetailMsg)}
+                            >
+                              Copy FHIR ID
+                            </button>
           
-                          <div className="mt-2 text-xs text-slate-600">
-                            <span className="font-semibold">Issuer:</span>{" "}
-                            <span className="text-slate-800">
-                              {selectedRecord.issuer}
-                            </span>
-                          </div>
-          
-                          <div className="mt-1 text-xs text-slate-600">
-                            <span className="font-semibold">FHIR ID:</span>{" "}
-                            <span className="font-mono text-slate-800">{h.id}</span>
-                          </div>
-          
-                          <div className="mt-1 text-xs text-slate-600">
-                            <span className="font-semibold">Pointer:</span>{" "}
-                            <span className="font-mono text-slate-800">
-                              {selectedRecord.pointer_id}
-                            </span>
+                            <button
+                              className="btn-ghost"
+                              onClick={() =>
+                                copyText("JSON", JSON.stringify(selectedRecord.resource, null, 2), setDetailMsg)
+                              }
+                            >
+                              Copy JSON
+                            </button>
                           </div>
                         </div>
           
-                        <div className="flex flex-col gap-2 shrink-0">
-                          <button
-                            className="btn-ghost"
-                            onClick={() =>
-                              copyText("FHIR ID", String(h.id), setDetailMsg)
-                            }
-                          >
-                            Copy FHIR ID
-                          </button>
-          
-                          <button
-                            className="btn-ghost"
-                            onClick={() =>
-                              copyText(
-                                "JSON",
-                                JSON.stringify(
-                                  selectedRecord.resource,
-                                  null,
-                                  2
-                                ),
-                                setDetailMsg
-                              )
-                            }
-                          >
-                            Copy JSON
-                          </button>
-                        </div>
+                        {detailMsg ? (
+                          <div className="mt-2 text-xs text-slate-600">{detailMsg}</div>
+                        ) : null}
                       </div>
+                    );
+                  })()}
           
-                      {detailMsg ? (
-                        <div className="mt-2 text-xs text-slate-600">
-                          {detailMsg}
-                        </div>
-                      ) : null}
+                  {/* Raw JSON (hidden by default) */}
+                  {showRawJson ? (
+                    <div key={`${selectedRecord.pointer_id}-json`} className="fade-in">
+                      <pre className="code h-[520px]">
+                        {JSON.stringify(selectedRecord.resource, null, 2)}
+                      </pre>
                     </div>
-                  );
-                })()}
-          
-                <pre className="code h-[520px]">
-                  {JSON.stringify(selectedRecord.resource, null, 2)}
-                </pre>
-              </>
-            ) : (
-              <div className="text-sm text-slate-600">No selection.</div>
-            )}
+                  ) : (
+                    <div className="empty fade-in">
+                      Raw JSON is hidden by default. Click <span className="font-medium">View JSON</span> to inspect the full FHIR payload.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-slate-600">No selection.</div>
+              )}
+            </div>
           </div>
-          </div>
+
         </div>
       ) : null}
 
