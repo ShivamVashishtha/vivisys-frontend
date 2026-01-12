@@ -472,21 +472,6 @@ async function searchProviders() {
   }
 }
 
-
-function selectProvider(p: any) {
-  const picked = {
-    name: p.name,
-    npi: p.npi,
-    taxonomy: p.taxonomy?.desc || p.taxonomy?.code || undefined,
-    phone: p.address?.telephone_number ?? null,
-  };
-
-  setProviderSource(picked);
-
-  try {
-    localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
-  } catch {}
-}
   
   // ===== NEW: Patient login =====
   async function loginPatient() {
