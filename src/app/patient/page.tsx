@@ -196,7 +196,9 @@ export default function PatientPage() {
     // Selected hospital (persisted on backend)
   const [hospitalSource, setHospitalSource] = useState<{ name: string; npi?: string } | null>(null);
   const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
-  
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
   const [hName, setHName] = useState("");
@@ -877,79 +879,97 @@ async function selectHospital(h: CMSHospital) {
       </div>
 
 
-      {/* Add my pointer */}
+      {/* Advanced (Add pointer) */}
       <div className="card">
         <div className="card-h">
-          <div className="text-sm font-semibold">Add my record pointer</div>
-          <div className="text-xs text-slate-500">
-            Adds a pointer to your own FHIR record (HAPI FHIR). Then you can fetch and view it.
+          <div>
+            <div className="text-sm font-semibold">Advanced</div>
+            <div className="text-xs text-slate-500">
+              Optional tools for linking external records (FHIR pointers). Most patients won’t need this.
+            </div>
           </div>
+      
+          <button className="btn-ghost" onClick={() => setShowAdvanced((v) => !v)}>
+            {showAdvanced ? "Hide" : "Show"}
+          </button>
         </div>
-
-        <div className="card-b grid gap-3">
-          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
-            <div>
-              <div className="label">Scope</div>
-              <select className="input mt-2" value={ptrScope} onChange={(e) => setPtrScope(e.target.value as Scope)}>
-                <option value="immunizations">immunizations</option>
-                <option value="allergies">allergies</option>
-                <option value="conditions">conditions</option>
-              </select>
-            </div>
-
-            <div>
-              <div className="label">FHIR Resource ID</div>
-              <input
-                className="input mt-2"
-                value={ptrFhirId}
-                onChange={(e) => setPtrFhirId(e.target.value)}
-                placeholder='e.g. "1001"'
-              />
-            </div>
-
-            <div>
-              <div className="label">Source</div>
-            
-              <select
-                className="input mt-2"
-                value={sourceMode}
-                onChange={(e) => {
-                  const v = e.target.value as "hospital" | "other";
-                  setSourceMode(v);
-                  if (v === "hospital" && hospitalSource) {
-                    setPtrIssuer(hospitalSource.name);
-                  }
-                }}
-              >
-                <option value="hospital" disabled={!hospitalSource}>
-                  Hospital{hospitalSource ? ` (${hospitalSource.name})` : " (none selected)"}
-                </option>
-                <option value="other">Other / Self-reported</option>
-              </select>
-            
-              {sourceMode === "other" && (
+      
+        {showAdvanced ? (
+          <div className="card-b fade-in grid gap-3">
+            {/* ✅ Paste your existing Add Pointer UI here exactly as-is */}
+            {/* Example structure (keep your exact existing fields/handlers): */}
+      
+            <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_1fr_160px] gap-2 items-end">
+              <div>
+                <div className="label">Scope</div>
+                <select className="input mt-2" value={ptrScope} onChange={(e) => setPtrScope(e.target.value as any)}>
+                  <option value="immunizations">immunizations</option>
+                  <option value="allergies">allergies</option>
+                  <option value="conditions">conditions</option>
+                </select>
+              </div>
+      
+              <div>
+                <div className="label">FHIR Resource ID</div>
                 <input
                   className="input mt-2"
-                  placeholder="Enter source (e.g. Self, Clinic name)"
-                  value={ptrIssuer}
-                  onChange={(e) => setPtrIssuer(e.target.value)}
+                  value={ptrFHIRId}
+                  onChange={(e) => setPtrFHIRId(e.target.value)}
+                  placeholder="e.g. 12345"
                 />
-              )}
+                <div className="mt-1 text-xs text-slate-500">
+                  Paste the FHIR resource id (from your provider system).
+                </div>
+              </div>
+      
+              <div>
+                <div className="label">Source</div>
+                <select
+                  className="input mt-2"
+                  value={ptrSourceMode}
+                  onChange={(e) => {
+                    const v = e.target.value as "hospital" | "other";
+                    setPtrSourceMode(v);
+                    if (v === "hospital" && hospitalSource) setPtrIssuer(hospitalSource.name);
+                  }}
+                >
+                  <option value="hospital" disabled={!hospitalSource}>
+                    Hospital{hospitalSource ? ` (${hospitalSource.name})` : " (none selected)"}
+                  </option>
+                  <option value="other">Other / Self-reported</option>
+                </select>
+      
+                {ptrSourceMode === "other" ? (
+                  <input
+                    className="input mt-2"
+                    placeholder="Enter source (e.g. Self, Clinic name)"
+                    value={ptrIssuer}
+                    onChange={(e) => setPtrIssuer(e.target.value)}
+                  />
+                ) : null}
+              </div>
+      
+              <button className="btn-primary" disabled={loading} onClick={addPointerForMe}>
+                {loading ? "Working..." : "Add pointer"}
+              </button>
             </div>
-
-
-            <button className="btn-primary" disabled={loading} onClick={addMyPointer}>
-              {loading ? "Working..." : "Add"}
-            </button>
+      
+            {ptrMsg ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                {ptrMsg}
+              </div>
+            ) : null}
           </div>
-
-          {ptrMsg ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              {ptrMsg}
+        ) : (
+          <div className="card-b">
+            <div className="empty">
+              Advanced tools are hidden to keep the UI clean. Click <span className="font-medium">Show</span> to link external
+              records.
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
       </div>
+
 
       {/* Fetch records */}
       <div className="card">
