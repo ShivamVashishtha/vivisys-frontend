@@ -64,6 +64,14 @@ function selectProvider(p: any) {
     phone: p.address?.telephone_number ?? null,
   };
 
+  setProviderSource(picked);
+
+  try {
+    localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
+  } catch {}
+}
+
+
 
 function formatDate(s?: string) {
   if (!s) return "—";
@@ -535,22 +543,6 @@ async function searchProviders() {
     } finally {
       setLoading(false);
     }
-  }
-
-
-  function selectProvider(p: any) {
-    const picked = {
-      name: p.name,
-      npi: p.npi,
-      taxonomy: p.taxonomy?.desc || p.taxonomy?.code || undefined,
-      phone: p.address?.telephone_number ?? null,
-    };
-
-    setProviderSource(picked);
-
-    try {
-      localStorage.setItem("vivisys_selected_provider", JSON.stringify(picked));
-    } catch {}
   }
   
   async function createAndLinkFromCatalog() {
@@ -1583,7 +1575,6 @@ async function searchProviders() {
                 
                       return (
                         <tr key={p.npi}>
-                          {/* Provider */}
                           <td>
                             <div className="font-medium text-slate-900">{p.name}</div>
                             <div className="text-xs text-slate-500">
@@ -1591,35 +1582,28 @@ async function searchProviders() {
                             </div>
                           </td>
                 
-                          {/* Address */}
                           <td className="text-slate-700">
                             {[
                               p.address?.line1,
-                              [p.address?.city, p.address?.state, p.address?.postal_code]
-                                .filter(Boolean)
-                                .join(", "),
+                              [p.address?.city, p.address?.state, p.address?.postal_code].filter(Boolean).join(", "),
                             ]
                               .filter(Boolean)
                               .join(" · ")}
                           </td>
                 
-                          {/* Taxonomy */}
                           <td>
-                            <span className="pill">
-                              {p.taxonomy?.desc || p.taxonomy?.code || "—"}
-                            </span>
+                            <span className="pill">{p.taxonomy?.desc || p.taxonomy?.code || "—"}</span>
                           </td>
                 
-                          {/* NPI */}
                           <td className="font-mono text-xs">{p.npi}</td>
                 
-                          {/* Select action */}
+                          {/* ✅ Select action */}
                           <td className="text-right">
                             <button
                               className={isSelected ? "btn-secondary" : "btn-primary"}
                               onClick={() => {
-                                selectProvider(p);          // sets providerSource
-                                setProviderModalOpen(false); // closes modal
+                                selectProvider(p);            // sets providerSource + localStorage
+                                setProviderModalOpen(false);  // closes modal
                               }}
                             >
                               {isSelected ? "Selected" : "Select"}
@@ -1636,6 +1620,7 @@ async function searchProviders() {
                     </tr>
                   )}
                 </tbody>
+
 
               </table>
             </div>
