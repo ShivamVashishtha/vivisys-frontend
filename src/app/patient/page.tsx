@@ -398,15 +398,16 @@ async function selectHospital(h: CMSHospital) {
   }
 }
 
+  
 async function selectProvider(p: any) {
   const picked = {
     npi: String(p.npi),
     name: String(p.name || ""),
-    taxonomy: p.taxonomy?.desc || p.taxonomy?.code || "",
-    phone: p.address?.telephone_number || "",
+    taxonomy: p.taxonomy?.desc || p.taxonomy?.code || undefined,
+    phone: p.address?.telephone_number ?? null,
   };
 
-  // update UI state
+  // UI state
   setProviderSource(picked);
 
   // local fallback
@@ -414,24 +415,20 @@ async function selectProvider(p: any) {
     localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
   } catch {}
 
-  // persist to backend (DB)
-  try {
-    await api.setMyProviderSelection({
-      npi: picked.npi,
-      name: picked.name,
-      taxonomy_desc: picked.taxonomy || null,
-      telephone_number: picked.phone || null,
-      line1: p.address?.line1 ?? null,
-      line2: null,
-      city: p.address?.city ?? null,
-      state: p.address?.state ?? null,
-      postal_code: p.address?.postal_code ?? null,
-    });
-  } catch (e: any) {
-    // if save fails, keep UI selection but show error somewhere you already use (pErr or err)
-    setPErr?.(e?.message ?? "Could not save doctor selection"); // if you have setPErr
-  }
+  // ✅ DB persist
+  await api.setMyProviderSelection({
+    npi: picked.npi,
+    name: picked.name,
+    taxonomy_desc: picked.taxonomy ?? null,
+    telephone_number: picked.phone ?? null,
+    line1: p.address?.line1 ?? null,
+    line2: null,
+    city: p.address?.city ?? null,
+    state: p.address?.state ?? null,
+    postal_code: p.address?.postal_code ?? null,
+  });
 }
+
 
   
 async function searchProviders() {
@@ -1643,8 +1640,8 @@ async function searchProviders() {
                           <td className="text-right">
                             <button
                               className={isSelected ? "btn-secondary" : "btn-primary"}
-                              onClick={() => {
-                                selectProvider(p);            // sets providerSource + localStorage
+                              onClick={async () => {
+                                await selectProvider(p);            // sets providerSource + localStorage
                                 setProviderModalOpen(false);  // closes modal
                               }}
                             >
