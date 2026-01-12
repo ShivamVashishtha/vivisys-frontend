@@ -56,6 +56,33 @@ function primaryTaxonomy(h: CMSHospital) {
   return primary?.desc || primary?.code || "—";
 }
 
+function selectProvider(p: any) {
+  const picked = {
+    name: p.name,
+    npi: p.npi,
+    taxonomy: p.taxonomy?.desc || p.taxonomy?.code || undefined,
+    phone: p.address?.telephone_number ?? null,
+  };
+
+  setProviderSource(picked);
+
+  // local fallback
+  try {
+    localStorage.setItem(PROVIDER_KEY, JSON.stringify(picked));
+  } catch {}
+
+  // optional backend persist (if you add api method)
+  // If not implemented yet, this will just no-op silently.
+  api
+    .setMyProviderSelection?.({
+      npi: picked.npi ?? null,
+      name: picked.name,
+      taxonomy_desc: picked.taxonomy ?? null,
+      telephone_number: picked.phone ?? null,
+    })
+    .catch(() => {});
+}
+
 
 function formatDate(s?: string) {
   if (!s) return "—";
@@ -200,6 +227,16 @@ export default function PatientPage() {
   const [catStep, setCatStep] = useState<1 | 2 | 3 | 4>(1);
   const [showRawJson, setShowRawJson] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Selected provider (doctor) (persisted/local fallback)
+  const [providerSource, setProviderSource] = useState<{
+    name: string;
+    npi?: string;
+    taxonomy?: string;
+    phone?: string | null;
+  } | null>(null);
+  
+  const PROVIDER_KEY = "vivisys_selected_provider";
+
   
   // Modal UI
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
@@ -766,6 +803,58 @@ async function searchProviders() {
           )}
         </div>
       </div>
+
+        {/* Selected provider (doctor) */}
+        <div className="card">
+          <div className="card-h flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Selected doctor (optional)</div>
+              <div className="text-xs text-slate-500">
+                If selected, we’ll attach this clinician as context for new records (doesn’t modify hospital source).
+              </div>
+            </div>
+        
+            <button
+              className="btn-ghost"
+              onClick={() => setProviderModalOpen(true)}
+              disabled={!hospitalSource && !(hCity || hState || hPostal)}
+              title={
+                hospitalSource
+                  ? "Find doctors near your selected hospital"
+                  : "Tip: Select a hospital or fill City/State/ZIP first"
+              }
+            >
+              {providerSource ? "Change" : "Find doctors"}
+            </button>
+          </div>
+        
+          <div className="card-b">
+            {providerSource ? (
+              <div className="grid gap-2 fade-in">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="pill-success">{providerSource.name}</span>
+                  {providerSource.npi ? <span className="pill">NPI: {providerSource.npi}</span> : null}
+                  {providerSource.taxonomy ? <span className="pill">{providerSource.taxonomy}</span> : null}
+                  {providerSource.phone ? <span className="pill">☎ {providerSource.phone}</span> : null}
+                </div>
+        
+                <button
+                  className="btn-ghost w-fit"
+                  onClick={() => {
+                    setProviderSource(null);
+                    try {
+                      localStorage.removeItem(PROVIDER_KEY);
+                    } catch {}
+                  }}
+                >
+                  Clear doctor selection
+                </button>
+              </div>
+            ) : (
+              <div className="empty">No doctor selected. Use “Find doctors” to select one.</div>
+            )}
+          </div>
+        </div>
 
 
       
@@ -1485,47 +1574,70 @@ async function searchProviders() {
                     <th>Address</th>
                     <th>Taxonomy</th>
                     <th>NPI</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {pResults.length ? (
-                    pResults.map((p: any) => (
-                      <tr key={p.npi}>
-                        <td>
-                          <div className="font-medium text-slate-900">{p.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {p.address?.telephone_number ? `☎ ${p.address.telephone_number}` : " "}
-                          </div>
-                        </td>
-  
-                        <td className="text-slate-700">
-                          {[
-                            p.address?.line1,
-                            [p.address?.city, p.address?.state, p.address?.postal_code]
+                    pResults.map((p: any) => {
+                      const isSelected = providerSource?.npi === p.npi;
+                
+                      return (
+                        <tr key={p.npi}>
+                          {/* Provider */}
+                          <td>
+                            <div className="font-medium text-slate-900">{p.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {p.address?.telephone_number ? `☎ ${p.address.telephone_number}` : " "}
+                            </div>
+                          </td>
+                
+                          {/* Address */}
+                          <td className="text-slate-700">
+                            {[
+                              p.address?.line1,
+                              [p.address?.city, p.address?.state, p.address?.postal_code]
+                                .filter(Boolean)
+                                .join(", "),
+                            ]
                               .filter(Boolean)
-                              .join(", "),
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </td>
-  
-                        <td>
-                          <span className="pill">
-                            {p.taxonomy?.desc || p.taxonomy?.code || "—"}
-                          </span>
-                        </td>
-  
-                        <td className="font-mono text-xs">{p.npi}</td>
-                      </tr>
-                    ))
+                              .join(" · ")}
+                          </td>
+                
+                          {/* Taxonomy */}
+                          <td>
+                            <span className="pill">
+                              {p.taxonomy?.desc || p.taxonomy?.code || "—"}
+                            </span>
+                          </td>
+                
+                          {/* NPI */}
+                          <td className="font-mono text-xs">{p.npi}</td>
+                
+                          {/* Select action */}
+                          <td className="text-right">
+                            <button
+                              className={isSelected ? "btn-secondary" : "btn-primary"}
+                              onClick={() => {
+                                selectProvider(p);          // sets providerSource
+                                setProviderModalOpen(false); // closes modal
+                              }}
+                            >
+                              {isSelected ? "Selected" : "Select"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="text-slate-500">
+                      <td colSpan={5} className="px-4 py-6 text-slate-500 text-center">
                         Enter a last name and search to see results.
                       </td>
                     </tr>
                   )}
                 </tbody>
+
               </table>
             </div>
   
