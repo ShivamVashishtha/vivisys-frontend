@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, clearToken, Scope } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AppShell from "@/app/_components/AppShell";
+
 
 type RecordItem = {
   issuer: string;
@@ -52,6 +53,27 @@ function resourceSummary(resource: any) {
   };
 }
 
+function verificationFromIssuer(issuer: string) {
+  const s = String(issuer || "").toLowerCase();
+
+  // Heuristic rules (you can refine later)
+  if (s.includes("self")) {
+    return { label: "Patient-reported", tone: "warning" as const };
+  }
+  if (s.includes("http") || s.includes("fhir") || s.includes("hapi")) {
+    return { label: "External pointer", tone: "danger" as const };
+  }
+  return { label: "Hospital-verified", tone: "success" as const };
+}
+
+function VerificationPill(props: { issuer: string }) {
+  const v = verificationFromIssuer(props.issuer);
+  if (v.tone === "success") return <span className="pill-success">{v.label}</span>;
+  if (v.tone === "warning") return <span className="pill-warning">{v.label}</span>;
+  return <span className="pill-danger">{v.label}</span>;
+}
+
+
 function summarizeForHeader(resource: any) {
   const rt = resource?.resourceType ?? "Resource";
 
@@ -94,6 +116,14 @@ async function copyText(label: string, value: string, onMsg?: (m: string) => voi
 
 export default function DoctorPage() {
   const router = useRouter();
+  const [snapLoading, setSnapLoading] = useState(false);
+  const [snapErr, setSnapErr] = useState("");
+  const [snapshot, setSnapshot] = useState<null | {
+    immunizations: number;
+    allergies: number;
+    conditions: number;
+    updatedAt: string;
+  }>(null);
 
   const [patientId, setPatientId] = useState("");
   const [scope, setScope] = useState<Scope>("immunizations");
@@ -103,6 +133,8 @@ export default function DoctorPage() {
   const [loading, setLoading] = useState(false);
   
   const [detailMsg, setDetailMsg] = useState<string>("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSavedMsg, setNoteSavedMsg] = useState("");
 
   const records: RecordItem[] = useMemo(() => result?.records ?? [], [result]);
   const selectedRecord = records[selected];
@@ -122,11 +154,72 @@ export default function DoctorPage() {
     }
   }
 
+  async function fetchSnapshot() {
+  const pid = patientId.trim();
+  if (!pid) {
+    setSnapErr("Enter a patient id first.");
+    return;
+  }
+
+  setSnapLoading(true);
+  setSnapErr("");
+
+  try {
+    const [im, al, co] = await Promise.all([
+      api.getRecords(pid, "immunizations"),
+      api.getRecords(pid, "allergies"),
+      api.getRecords(pid, "conditions"),
+    ]);
+
+    const updatedAt = new Date().toLocaleString();
+    setSnapshot({
+      immunizations: im?.count ?? (im?.records?.length ?? 0),
+      allergies: al?.count ?? (al?.records?.length ?? 0),
+      conditions: co?.count ?? (co?.records?.length ?? 0),
+      updatedAt,
+    });
+  } catch (e: any) {
+    setSnapErr(e?.message ?? "Failed to load snapshot");
+    setSnapshot(null);
+  } finally {
+    setSnapLoading(false);
+  }
+}
+
+  
   function logout() {
     clearToken();
     router.push("/login");
   }
 
+  function notesKey() {
+  const pid = patientId.trim() || "unknown";
+  return `vivisys_doctor_notes:${pid}`;
+}
+
+useEffect(() => {
+  // Load note when patientId changes
+  try {
+    const raw = localStorage.getItem(notesKey());
+    setNoteDraft(raw || "");
+  } catch {
+    setNoteDraft("");
+  }
+  setNoteSavedMsg("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [patientId]);
+
+function saveNote() {
+  try {
+    localStorage.setItem(notesKey(), noteDraft);
+    setNoteSavedMsg("✅ Saved (private to this browser)");
+    setTimeout(() => setNoteSavedMsg(""), 1500);
+  } catch {
+    setNoteSavedMsg("❌ Could not save");
+  }
+}
+
+  
   return (
     <AppShell
       title="Doctor Console"
@@ -143,6 +236,39 @@ export default function DoctorPage() {
             Provide a Patient Global ID. Access is enforced by consent on the backend.
           </div>
         </div>
+        {/* Cross-scope snapshot */}
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="text-sm font-semibold">Patient snapshot</div>
+              <div className="text-xs text-slate-500">
+                One-glance counts across scopes (consent still enforced per scope).
+              </div>
+            </div>
+        
+            <button className="btn-ghost" onClick={fetchSnapshot} disabled={snapLoading}>
+              {snapLoading ? "Loading..." : "Refresh snapshot"}
+            </button>
+          </div>
+        
+          <div className="card-b">
+            {snapErr ? <div className="callout-warning">{snapErr}</div> : null}
+        
+            {snapshot ? (
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="pill-success">Immunizations: {snapshot.immunizations}</span>
+                <span className="pill-success">Allergies: {snapshot.allergies}</span>
+                <span className="pill-success">Conditions: {snapshot.conditions}</span>
+                <span className="pill">Updated: {snapshot.updatedAt}</span>
+              </div>
+            ) : (
+              <div className="empty">
+                Click <span className="font-medium">Refresh snapshot</span> after entering a patient id.
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="card-b grid gap-3">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_240px_140px] gap-2">
             <div>
@@ -238,7 +364,10 @@ export default function DoctorPage() {
                           <span className="pill">{s.status}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-slate-900">{r.issuer}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-slate-900">{r.issuer}</div>
+                            <VerificationPill issuer={r.issuer} />
+                          </div>
                           <div className="text-xs text-slate-500 font-mono">
                             ptr:{r.pointer_id.slice(0, 8)}…
                           </div>
@@ -351,7 +480,29 @@ export default function DoctorPage() {
                       </div>
                     );
                   })()}
-            
+                {/* Private clinical notes (does not modify patient data) */}
+                  <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900">Private clinical notes</div>
+                      <button className="btn-ghost" onClick={saveNote}>
+                        Save
+                      </button>
+                    </div>
+                  
+                    <div className="text-xs text-slate-500 mt-1">
+                      Stored locally in your browser. Not written to the patient’s record.
+                    </div>
+                  
+                    <textarea
+                      className="input mt-3 min-h-[110px]"
+                      value={noteDraft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      placeholder="Assessment / reminder / follow-up…"
+                    />
+                  
+                    {noteSavedMsg ? <div className="mt-2 text-xs text-slate-600">{noteSavedMsg}</div> : null}
+                  </div>
+
                   <pre className="code h-[520px]">
             {JSON.stringify(selectedRecord.resource, null, 2)}
                   </pre>
