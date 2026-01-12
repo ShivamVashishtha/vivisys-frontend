@@ -262,6 +262,51 @@ export const api = {
     }>(`/hospitals/cms/search?${qs.toString()}`, {}, false);
   },
 
+    // ======================
+  // CMS NPI Registry (Providers / NPI-1)
+  // ======================
+  searchProvidersCMS: (payload: {
+    first_name?: string;
+    last_name?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    limit?: number;
+    skip?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (payload.first_name) q.set("first_name", payload.first_name);
+    if (payload.last_name) q.set("last_name", payload.last_name);
+    if (payload.city) q.set("city", payload.city);
+    if (payload.state) q.set("state", payload.state);
+    if (payload.postal_code) q.set("postal_code", payload.postal_code);
+    q.set("limit", String(payload.limit ?? 10));
+    q.set("skip", String(payload.skip ?? 0));
+
+    return request<{
+      source: string;
+      result_count: number;
+      results: Array<{
+        npi: string;
+        name: string;
+        status?: string;
+        last_updated?: string;
+        address?: {
+          line1?: string;
+          line2?: string | null;
+          city?: string;
+          state?: string;
+          postal_code?: string;
+          country_code?: string;
+          telephone_number?: string;
+        };
+        taxonomy?: { code?: string; desc?: string; primary?: boolean };
+        raw?: any;
+      }>;
+    }>(`/providers/cms/search?${q.toString()}`, {}, true);
+  },
+
+
 
     // ======================
   // Patient hospital selection
