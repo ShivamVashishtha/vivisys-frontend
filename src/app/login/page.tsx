@@ -53,8 +53,8 @@ export default function LoginPage() {
                 Mx
               </div>
               <div>
-                <div className="text-lg font-semibold">Medaryx Portal</div>
-                <div className="text-sm text-slate-600">Health records access (Demo)</div>
+                <div className="text-lg font-semibold">Vivisys Portal</div>
+                <div className="text-sm text-slate-600">Access your or your patient's health records securely</div>
               </div>
             </div>
 
@@ -62,17 +62,14 @@ export default function LoginPage() {
               <div className="card p-4 bg-slate-50 border-slate-100">
                 <div className="font-semibold">How this demo works</div>
                 <ul className="mt-2 space-y-1 list-disc pl-5 text-slate-600">
-                  <li>Guardians create patients and register FHIR pointers.</li>
-                  <li>Guardians grant consent to doctors (scope + expiry).</li>
-                  <li>Doctors can fetch records only with valid consent.</li>
-                  <li>Patients (18+) can access their own records directly.</li>
+                  <li>Patients can access their own records directly when signed in.</li>
+                  <li>Doctors can fetch records only with valid consent in place.</li>
+                  <li>Patient onboarding and caregiver flows are still being refined.</li>
                 </ul>
               </div>
 
               <div className="text-xs text-slate-500">
-                Tip: create accounts for{" "}
-                <span className="font-medium">guardian@test.com</span>,{" "}
-                <span className="font-medium">doctor@test.com</span>,{" "}
+                Tip: create accounts for <span className="font-medium">doctor@test.com</span> and{" "}
                 <span className="font-medium">patient@test.com</span> (same password).
               </div>
             </div>
@@ -115,7 +112,7 @@ export default function LoginPage() {
                     onClick={() => setRole("guardian")}
                     type="button"
                   >
-                    Guardian
+                    Guardin (WIP)
                   </button>
                   <button
                     className={role === "doctor" ? "btn-primary" : "btn-ghost"}
