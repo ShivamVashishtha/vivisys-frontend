@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="card-b">
             <div className="flex items-center gap-2">
               <Image
-                src="/static/media/VivisysLogo.png"
+                src="/VivisysLogo.png"
                 alt="Vivisys Logo"
                 width={120}
                 height={40}

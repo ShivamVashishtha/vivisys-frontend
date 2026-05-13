@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "Vivisys",
   description: "Health Records Portal (Demo)",
   icons: {
-    icon: "/static/media/favicon.ico",
+    icon: "/favicon.ico",
   },
 };
 
