@@ -5,8 +5,11 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Medaryx",
+  title: "Vivisys",
   description: "Health Records Portal (Demo)",
+  icons: {
+    icon: "/static/media/favicon.ico",
+  },
 };
 
 

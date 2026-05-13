@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { api, setToken, Role } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -49,13 +50,14 @@ export default function LoginPage() {
         <div className="card overflow-hidden">
           <div className="card-b">
             <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-xl bg-slate-900 text-white grid place-items-center font-bold">
-                Mx
-              </div>
-              <div>
-                <div className="text-lg font-semibold">Vivisys Portal</div>
-                <div className="text-sm text-slate-600">Access your health records securely</div>
-              </div>
+              <Image
+                src="/static/media/VivisysLogo.png"
+                alt="Vivisys Logo"
+                width={120}
+                height={40}
+                priority
+                className="h-10 w-auto"
+              />
             </div>
 
             <div className="mt-6 space-y-3 text-sm text-slate-700">
