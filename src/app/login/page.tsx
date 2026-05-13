@@ -54,7 +54,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <div className="text-lg font-semibold">Vivisys Portal</div>
-                <div className="text-sm text-slate-600">Access your or your patient's health records securely</div>
+                <div className="text-sm text-slate-600">Access your health records securely</div>
               </div>
             </div>
 
