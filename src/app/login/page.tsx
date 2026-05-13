@@ -114,7 +114,7 @@ export default function LoginPage() {
                     onClick={() => setRole("guardian")}
                     type="button"
                   >
-                    Guardin (WIP)
+                    Guardian (WIP)
                   </button>
                   <button
                     className={role === "doctor" ? "btn-primary" : "btn-ghost"}
