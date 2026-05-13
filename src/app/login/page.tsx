@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("register");
-  const [role, setRole] = useState<Role>("guardian");
-  const [email, setEmail] = useState("guardian@test.com");
-  const [password, setPassword] = useState("pass12");
+  const [role, setRole] = useState<Role | "">("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,6 +19,12 @@ export default function LoginPage() {
 
   async function submit() {
     setErr(null);
+
+    if (!role) {
+      setErr("Select a role to continue.");
+      return;
+    }
+
     setLoading(true);
     try {
       const fn = mode === "register" ? api.register : api.login;
@@ -83,7 +89,6 @@ export default function LoginPage() {
                   {mode === "register" ? "Register to begin." : "Sign in to continue."}
                 </p>
               </div>
-              <span className="pill">v0</span>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-2">
